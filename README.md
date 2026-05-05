@@ -33,6 +33,6 @@ O ambiente de simulação no ModelSim está completamente automatizado através 
 
 Para uma compreensão detalhada acerca do percurso exato dos barramentos numéricos, diagramação da FSM principal de controle e do comportamento de cada módulo individual, verifique a documentação aprofundada incluída na raiz do repositório:
 
-**[Consulte o arquivo explicacoes/pipeline.txt](explicacoes/pipeline.txt)**
+**[Consulte o arquivo pipeline.txt](explicacoes/pipeline.txt)**
 
 A documentação aborda em linguagem minuciosa o comportamento do pipeline implementado, a adequação exigida do formato Q1.7 e Q2.14, bem como as restrições projetadas visando o futuro acoplamento de SRAM externa paralela para controle de Vídeo VGA e barramentos receptores UART.
