@@ -1,0 +1,55 @@
+########## EXPLICAÇÕES DO PROJETO TINY-CNN FPGA ##########
+
+## FLUXO DE DADOS E ARQUITETURA DE HARDWARE
+
+A arquitetura implementa uma Rede Neural Convolucional (CNN) orientada a hardware, desenvolvida como cerne do protótipo de Fechadura Biométrica Inteligente para a UFBA. Ocupa-se da inferência de imagens em escala de cinza de 32x32 pixels, a fim de liberar ou negar acesso. O processamento ocorre em pipeline e está estruturado nos seguintes módulos:
+
+1. Framebuffer Emulado (`framebuffer_32x32.v`):
+Atua temporariamente como o estágio de recepção da imagem para fins de simulação RTL (Artefato 2). O módulo recebe pixels sequencialmente (1 byte por pixel). O buffer é implementado utilizando duas memórias RAM independentes e espelhadas para simular o paralelismo de leitura da CNN e do controlador VGA. A operação de inferência é deflagrada pelo controlador principal quando o último endereço da imagem (1023) é gravado. Este módulo será substituído pela integração com a SRAM externa (512 KB) na versão final.
+
+2. Line Buffer (`line_buffer_32x32.v`):
+Responsável pelo condicionamento espacial dos dados. O módulo processa o fluxo unidimensional proveniente do framebuffer, retendo o histórico de pixels para formar duas linhas de atraso de 32 posições. A cada ciclo de clock, gera uma janela bidimensional contígua de 3x3 pixels. Este componente possibilita o avanço fluido do núcleo convolucional sobre a imagem, dispensando acessos redundantes à memória principal.
+
+3. Convolução MAC (`convolucao_mac.v`):
+Constitui o núcleo de processamento espacial. O módulo recebe as janelas 3x3 do Line Buffer e executa operações de Multiplicação e Acumulação (MAC) contra quatro filtros de pesos quantizados em 8 bits (formato Q1.7). Após o produto escalar, o módulo adiciona os respectivos termos de viés e aplica a função de ativação não-linear ReLU. Os dados são mantidos e saturados no formato de ponto fixo Q2.14, limitando transbordos aritméticos. O resultado consiste em quatro canais espaciais paralelos.
+
+4. Max Pooling (`max_pooling_design.v`):
+Realiza a redução de dimensionalidade espacial. O módulo opera individualmente sobre os quatro canais gerados pela convolução, extraindo o valor máximo presente em matrizes contíguas de 2x2 pixels. O controle de vizinhança emprega buffers internos e registradores FIFO, sincronizando as linhas adjacentes geradas no estágio anterior.
+
+5. Serialização / Flatten (`flatten.v`):
+Opera como interface de transição entre o domínio espacial e o domínio linear. O módulo processa os mapas bidimensionais reduzidos pelo Max Pooling e os converte em um fluxo de dados unidimensional. A conclusão da transferência deste volume é sinalizada à próxima camada através de um pulso de controle lógico.
+
+6. Camada Densa (`dense_900x7.v`):
+Executa o mapeamento final das características para as classes de predição (compostas pelos membros da equipe e a classe "Desconhecido"). O módulo processa sequencialmente as 900 entradas oriundas do Flatten. Possui sete acumuladores operando simultaneamente. Cada entrada é multiplicada pelos pesos correspondentes e acumulada progressivamente. Após a ingestão do último elemento, o módulo incorpora os termos de viés, aplica o deslocamento aritmético para o reenquadramento ao formato Q2.14 e gera pontuações brutas (scores) paralelamente.
+
+7. Argmax e Threshold (`argmax_threshold_7.v`):
+Módulo de decisão estrita. Avalia os sete scores da camada densa para identificar a classe de maior valor de ativação absoluto (argmax). O valor dominante é submetido a uma verificação de conformidade perante um limiar pré-configurado. Caso o score seja inferior ao limiar, o módulo atribui a predição à classe "Desconhecido". Do contrário, confirma o identificador da classe predominante correspondente ao respectivo membro da equipe.
+
+8. Memória de Pesos (`weights_shared_rom.v`):
+Estrutura de armazenamento não volátil que consolida todos os parâmetros pré-treinados. A memória é instanciada a partir de um arquivo de inicialização (.mif). O módulo distribui os parâmetros estaticamente para a convolução e via acesso dinâmico de endereços para a camada densa.
+
+9. Top-Level (`cnn_top.v`):
+Controlador lógico geral. Incorpora e alinha o roteamento de todas as instâncias e barramentos mencionados. É governado por uma Máquina de Estados Finita (FSM) que coordena o fluxo temporal do sistema, desde o acionamento inicial, orquestração da leitura de memória, até o sinal de confirmação do término da inferência.
+
+## DIRETRIZES DE INTEGRAÇÃO DE INTERFACES E PERIFÉRICOS (ARTEFATOS 3 E 4)
+
+A arquitetura foi delineada para suportar a integração com os periféricos da placa DE2-115 para o sistema final de visão.
+
+Integração UART:
+O protocolo UART será empregado para a recepção em tempo real das imagens oriundas da webcam, encaminhadas via script em uma estação base. A FSM do UART extrairá os bytes seriais do fluxo e orquestrará a escrita sistemática na memória SRAM externa.
+
+Integração de Memória SRAM Externa e Controlador VGA:
+O armazenamento transitório atual no módulo framebuffer será substituído pela SRAM externa de 512 KB da placa DE2-115, a qual assumirá o papel de Frame Buffer primário. Um módulo de arbitragem de memória será introduzido para coordenar a escrita simultânea da UART, a leitura de processamento da CNN e a leitura de exibição. O controlador VGA varrerá a SRAM projetando não apenas o rosto capturado em tempo real no monitor, mas também informações adicionais da interface de usuário, sinalizando formalmente a condição da fechadura como "Liberado" ou "Negado".
+
+## PROCEDIMENTO DE SIMULAÇÃO E VALIDAÇÃO RTL
+
+A validação da coerência estrutural da implementação em nível RTL ocorre mediante scripts TCL no ambiente ModelSim. O processo a seguir certifica a paridade dos cálculos locais em relação ao modelo original treinado em Python:
+
+1. Estabeleça o diretório do terminal na pasta raiz correspondente ao projeto. A validação dos caminhos relativos de compilação exige este posicionamento.
+2. Formate o vetor de teste contendo a imagem hexadecimal quantizada e ajuste o mapeamento referencial no construto de leitura do arquivo de testbench (localizado em modulos_verilog/tb_cnn_top.v).
+3. Inicie o fluxo de compilação ordenando o script gerenciador a partir do console do simulador:
+   do scripts/compile_project.do
+4. Acione a execução da simulação hierárquica por meio do script de transação:
+   do scripts/run_project.do
+
+O percurso resultará na ativação do testbench superior, processamento dos pixels e elaboração final dos resultados no formato de log, exibindo formalmente os scores de cada classe computados via simulação.
