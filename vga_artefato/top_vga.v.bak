@@ -1,0 +1,64 @@
+module top_vga (
+	input CLOCK_50,
+	output VGA_HS, 
+	output VGA_VS,
+	output [7:0] VGA_R,
+	output [7:0] VGA_G,
+	output [7:0] VGA_B
+); 
+
+
+	wire clk_25;
+	wire video_on;
+	wire [9:0] fio_x;
+	wire [9:0] fio_y;
+	
+	assign VGA_CLK = clk_25;
+	assign VGA_BLANK_N = video_on;
+	assign VGA_SYNC_N = 1'b0; 
+	
+	
+	vga_pll my_pll (
+			.inclk0(CLOCK_50),
+			.c0(clk_25)
+);
+
+	vga_sync scan_controller (
+		.clk(clk_25),
+		.rst(reset),
+		.hsync(VGA_HS),
+		.vsync(VGA_VS),
+		.pixel_x(fio_x),
+		.pixel_y(fio_y),
+		.video_on(video_on),
+);
+
+
+	always @(*) begin
+        // Padrão de segurança: Tela preta se estiver fora da área visível
+        if (video_on == 1'b0) begin
+            VGA_R = 8'd0;
+            VGA_G = 8'd0;
+            VGA_B = 8'd0;
+        end
+        else begin
+            // Se o contador X e Y estiverem no meio da tela (640/2 = 320, 480/2 = 240)
+            if (pixel_x >= 305 && pixel_x <= 335 && pixel_y >= 225 && pixel_y <= 255) begin
+                // Desenha a caixa VERDE (Simulando a detecção "Liberado")
+                VGA_R = 8'd0;
+                VGA_G = 8'd255;
+                VGA_B = 8'd0;
+            end
+            else begin
+                
+                VGA_R = 8'd128;
+                VGA_G = 8'd128;
+                VGA_B = 8'd128;
+            end
+        end
+    end
+
+endmodule
+	
+
+

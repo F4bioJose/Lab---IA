@@ -7,6 +7,9 @@
 module cnn_top (
     input wire clk,
     input wire rst,
+    // [PONTO DE INTEGRAÇÃO - UART]
+    // RX serial vindo do conversor USB/TTL.
+    input wire rx_pin,
     // [SINAL DE CONTROLE EXTERNO]
     // O sinal de início será acionado por um handshake via UART ou registrador de comando.
     input wire start_system,
@@ -35,6 +38,24 @@ module cnn_top (
     output reg access_done,
     output wire frame_ready
 );
+
+    // UART RX sincronizado para o clock interno
+    reg rx_sync_1;
+    reg rx_sync_2;
+
+    wire [7:0] uart_data;
+    wire uart_valid;
+    reg [9:0] uart_wr_addr;
+    reg uart_start_pulse;
+    reg uart_frame_pending;
+
+    // Sinal combinacional para escrita imediata no framebuffer
+    wire uart_wr_en_comb;
+
+    wire fb_wr_en_int;
+    wire [9:0] fb_wr_addr_int;
+    wire [7:0] fb_wr_data_int;
+    wire start_system_int;
 
     wire [7:0] fb_rd_data;
     reg [9:0] fb_rd_addr;
@@ -85,6 +106,23 @@ module cnn_top (
 
     reg [1:0] state;
 
+    // Evita o atraso de 1 ciclo que causaria off-by-one no endereço
+    assign uart_wr_en_comb = uart_valid && (state == ST_IDLE) && !frame_ready && !uart_frame_pending;
+
+    // UART RX: converte serial em byte + pulso de dado valido
+    uart_rx uart_rx_inst (
+        .clk(clk),
+        .rst(rst),
+        .rx_pin(rx_sync_2),
+        .data_out(uart_data),
+        .data_valid(uart_valid)
+    );
+
+    assign fb_wr_en_int = uart_wr_en_comb | fb_wr_en;
+    assign fb_wr_addr_int = uart_wr_en_comb ? uart_wr_addr : fb_wr_addr;
+    assign fb_wr_data_int = uart_wr_en_comb ? uart_data : fb_wr_data;
+    assign start_system_int = start_system | uart_start_pulse;
+
     // [MAPEAMENTO DE MEMÓRIA FUTURO (SRAM)]
     // NOTA PARA ARTEFATO 3: O Framebuffer deve ser substituído pela interface da SRAM.
     // Mapeamento sugerido para a SRAM de 512KB:
@@ -98,9 +136,9 @@ module cnn_top (
     framebuffer_32x32 framebuffer_inst (
         .clk(clk),
         .rst(rst),
-        .wr_en(fb_wr_en),
-        .wr_addr(fb_wr_addr),
-        .wr_data(fb_wr_data),
+        .wr_en(fb_wr_en_int),
+        .wr_addr(fb_wr_addr_int),
+        .wr_data(fb_wr_data_int),
         .rd_en(fb_rd_en),
         .rd_addr(fb_rd_addr),
         .rd_data(fb_rd_data),
@@ -208,6 +246,11 @@ module cnn_top (
 
     always @(posedge clk or posedge rst) begin
         if (rst) begin
+            rx_sync_1 <= 1'b1;
+            rx_sync_2 <= 1'b1;
+            uart_wr_addr <= 10'd0;
+            uart_start_pulse <= 1'b0;
+            uart_frame_pending <= 1'b0;
             state <= ST_IDLE;
             fb_rd_en <= 1'b0;
             fb_rd_en_d <= 1'b0;
@@ -218,9 +261,32 @@ module cnn_top (
             access_done <= 1'b0;
             frame_clear <= 1'b0;
         end else begin
+            rx_sync_1 <= rx_pin;
+            rx_sync_2 <= rx_sync_1;
+
+            uart_start_pulse <= 1'b0;
             access_done <= 1'b0;
             frame_clear <= 1'b0;
             fb_rd_en_d <= fb_rd_en;
+
+            // Incremento de endereço UART: avança APÓS a escrita combinacional
+            if (uart_wr_en_comb) begin
+                if (uart_wr_addr == 10'd1023) begin
+                    uart_wr_addr <= 10'd0;
+                    uart_frame_pending <= 1'b1;
+                end else begin
+                    uart_wr_addr <= uart_wr_addr + 10'd1;
+                end
+            end
+
+            if (uart_frame_pending && frame_ready && state == ST_IDLE) begin
+                uart_start_pulse <= 1'b1;
+                uart_frame_pending <= 1'b0;
+            end
+
+            if (frame_clear) begin
+                uart_wr_addr <= 10'd0;
+            end
 
             if (flat_valid) begin
                 if (dense_addr == 10'd899) begin
@@ -240,7 +306,7 @@ module cnn_top (
                     fb_rd_addr <= 10'd0;
                     rd_req_count <= 11'd0;
                     rd_val_count <= 11'd0;
-                    if (start_system && frame_ready) begin
+                    if (start_system_int && frame_ready) begin
                         state <= ST_READ;
                         frame_clear <= 1'b1;
                         dense_addr <= 10'd0;

@@ -8,9 +8,17 @@
 // ==============================================================================
 module tb_cnn_top;
 
+    localparam integer CLK_HALF_PERIOD_NS = 10; // 50 MHz clock
+    localparam integer BAUD_RATE = 1000000;
+    localparam integer BIT_PERIOD_NS = 1000000000 / BAUD_RATE;
+    localparam integer USE_UART = 1;
+
+    string img_file;
+
     reg clk;
     reg rst;
     reg start_system;
+    reg rx_pin;
 
     reg fb_wr_en;
     reg [9:0] fb_wr_addr;
@@ -34,6 +42,7 @@ module tb_cnn_top;
     cnn_top uut (
         .clk(clk),
         .rst(rst),
+        .rx_pin(rx_pin),
         .start_system(start_system),
         .fb_wr_en(fb_wr_en),
         .fb_wr_addr(fb_wr_addr),
@@ -48,46 +57,77 @@ module tb_cnn_top;
         .frame_ready(frame_ready)
     );
 
+    defparam uut.uart_rx_inst.BAUD_RATE = BAUD_RATE;
+
     initial begin
         clk = 1'b0;
-        forever #5 clk = ~clk;
+        forever #(CLK_HALF_PERIOD_NS) clk = ~clk;
     end
+
+    task send_uart_byte(input [7:0] data);
+        integer bit_idx;
+        begin
+            rx_pin = 1'b0;
+            #(BIT_PERIOD_NS);
+            for (bit_idx = 0; bit_idx < 8; bit_idx = bit_idx + 1) begin
+                rx_pin = data[bit_idx];
+                #(BIT_PERIOD_NS);
+            end
+            rx_pin = 1'b1;
+            #(BIT_PERIOD_NS);
+        end
+    endtask
 
     initial begin
         rst = 1'b1;
         start_system = 1'b0;
+        rx_pin = 1'b1;
         fb_wr_en = 1'b0;
         fb_wr_addr = 10'd0;
         fb_wr_data = 8'd0;
         vga_rd_en = 1'b0;
         vga_rd_addr = 10'd0;
 
+        img_file = "inputs/teste2.txt";
+        if ($value$plusargs("IMG=%s", img_file)) begin
+            $display("Using IMG file: %s", img_file);
+        end else begin
+            $display("Using default IMG file: %s", img_file);
+        end
+
         // Carrega a imagem de teste externa (arquivo texto com dados hexa) para a RAM local
-        $readmemh("inputs/teste2.txt", img_mem);
+        $readmemh(img_file, img_mem);
 
         #20;
         rst = 1'b0;
 
-        // Etapa 1: Injeta sequencialmente a imagem completa no framebuffer (1024 pixels)
-        for (i = 0; i < 1024; i = i + 1) begin
+        if (USE_UART) begin
+            #(BIT_PERIOD_NS * 2);
+            for (i = 0; i < 1024; i = i + 1) begin
+                send_uart_byte(img_mem[i]);
+            end
+        end else begin
+            // Etapa 1: Injeta sequencialmente a imagem completa no framebuffer (1024 pixels)
+            for (i = 0; i < 1024; i = i + 1) begin
+                @(negedge clk);
+                fb_wr_en = 1'b1;
+                fb_wr_addr = i[9:0];
+                fb_wr_data = img_mem[i];
+            end
+
             @(negedge clk);
-            fb_wr_en = 1'b1;
-            fb_wr_addr = i[9:0];
-            fb_wr_data = img_mem[i];
+            fb_wr_en = 1'b0;
+            fb_wr_addr = 10'd0;
+            fb_wr_data = 8'd0;
+
+            wait (frame_ready == 1'b1);
+
+            // Etapa 2: Sinaliza o início da execução da rede neural
+            @(negedge clk);
+            start_system = 1'b1;
+            @(negedge clk);
+            start_system = 1'b0;
         end
-
-        @(negedge clk);
-        fb_wr_en = 1'b0;
-        fb_wr_addr = 10'd0;
-        fb_wr_data = 8'd0;
-
-        wait (frame_ready == 1'b1);
-
-        // Etapa 2: Sinaliza o início da execução da rede neural
-        @(negedge clk);
-        start_system = 1'b1;
-        @(negedge clk);
-        start_system = 1'b0;
 
         // Etapa 3: Aguarda a conclusão e exibe detalhadamente os resultados no console
         wait (access_done == 1'b1);

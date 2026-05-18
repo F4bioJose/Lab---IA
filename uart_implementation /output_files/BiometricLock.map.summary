@@ -1,0 +1,14 @@
+Analysis & Synthesis Status : Successful - Tue May 12 20:51:15 2026
+Quartus Prime Version : 20.1.1 Build 720 11/11/2020 SJ Lite Edition
+Revision Name : BiometricLock
+Top-level Entity Name : uart_rx
+Family : Cyclone IV E
+Total logic elements : 73
+    Total combinational functions : 73
+    Dedicated logic registers : 40
+Total registers : 40
+Total pins : 12
+Total virtual pins : 0
+Total memory bits : 0
+Embedded Multiplier 9-bit elements : 0
+Total PLLs : 0
