@@ -17,6 +17,11 @@
 import argparse
 import sys
 import time
+import os
+
+# Suprime ABSOLUTAMENTE TODOS os warnings do Qt e do OpenCV no terminal do Linux
+os.environ["QT_LOGGING_RULES"] = "*=false"
+os.environ["OPENCV_LOG_LEVEL"] = "FATAL"
 
 import cv2
 import numpy as np
@@ -47,27 +52,37 @@ def parse_args():
         "--once", action="store_true",
         help="Enviar apenas um frame e sair"
     )
+    parser.add_argument(
+        "--mock", action="store_true",
+        help="Modo de simulação (não tenta abrir a porta serial real)"
+    )
     return parser.parse_args()
 
 
-def send_frame(ser: serial.Serial, frame: np.ndarray):
+def send_frame(ser, frame: np.ndarray):
     """Envia um frame 640x480 (307.200 bytes) via serial."""
     raw_bytes = frame.astype(np.uint8).tobytes()
     assert len(raw_bytes) == 307200, f"Frame deve ter 307200 bytes, tem {len(raw_bytes)}"
-    ser.write(raw_bytes)
-    ser.flush()
+    if ser is not None:
+        ser.write(raw_bytes)
+        ser.flush()
 
 
 def main():
     args = parse_args()
 
     # Abre a porta serial
-    try:
-        ser = serial.Serial(args.port, args.baud, timeout=1)
-        print(f"[OK] Porta serial {args.port} aberta a {args.baud} baud")
-    except serial.SerialException as e:
-        print(f"[ERRO] Não foi possível abrir {args.port}: {e}")
-        sys.exit(1)
+    ser = None
+    if not args.mock:
+        try:
+            ser = serial.Serial(args.port, args.baud, timeout=1)
+            print(f"[OK] Porta serial {args.port} aberta a {args.baud} baud")
+        except serial.SerialException as e:
+            print(f"[ERRO] Não foi possível abrir {args.port}: {e}")
+            print("[INFO] Dica: Use a flag --mock se quiser testar a câmera sem a placa conectada.")
+            sys.exit(1)
+    else:
+        print(f"[MOCK] Rodando em modo de simulação. Os dados não serão enviados para {args.port}.")
 
     # Aguarda a FPGA estabilizar após reset
     time.sleep(0.1)
@@ -81,7 +96,8 @@ def main():
         frame = cv2.resize(img, (640, 480), interpolation=cv2.INTER_AREA)
         send_frame(ser, frame)
         print(f"[OK] Imagem '{args.file}' enviada ({frame.shape})")
-        ser.close()
+        if ser is not None:
+            ser.close()
         return
 
     # === Modo webcam contínuo ===
@@ -106,24 +122,33 @@ def main():
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             out_frame = cv2.resize(gray, (640, 480), interpolation=cv2.INTER_AREA)
 
-            # Envia via UART
+            # Envia via UART o frame capturado
             send_frame(ser, out_frame)
             frame_count += 1
 
-            # Exibe preview no PC
-            cv2.imshow("Enviando para FPGA (640x480)", out_frame)
+            # Mostra FPS a cada frame enviado
+            elapsed = time.time() - t_start
+            fps = frame_count / elapsed if elapsed > 0 else 0
+            print(f"  Frames enviados: {frame_count} | Tempo decorrido: {elapsed:.1f}s")
 
-            # Mostra FPS a cada 30 frames
-            if frame_count % 30 == 0:
-                elapsed = time.time() - t_start
-                fps = frame_count / elapsed if elapsed > 0 else 0
-                print(f"  Frames enviados: {frame_count} | FPS: {fps:.1f}")
-
-            # Delay para dar tempo à UART de transmitir (307.200 bytes × 10 bits / baud)
+            # Delay para dar tempo à UART de transmitir (~26 segundos para 640x480)
             tx_time = (307200 * 10) / args.baud
-            time.sleep(max(0, tx_time - 0.001))  # Margem de 1ms
-
-            if cv2.waitKey(1) & 0xFF == ord('q'):
+            
+            # Durante a espera da UART, mantemos a câmera gravando e exibindo para o preview ficar fluido a 30 FPS!
+            t_end = time.time() + max(0, tx_time - 0.001)
+            quit_req = False
+            while time.time() < t_end:
+                ret_live, live_frame = cap.read()
+                if ret_live:
+                    live_gray = cv2.cvtColor(live_frame, cv2.COLOR_BGR2GRAY)
+                    live_out = cv2.resize(live_gray, (640, 480), interpolation=cv2.INTER_AREA)
+                    cv2.imshow("Preview ao vivo da Webcam (aguardando envio...)", live_out)
+                
+                if cv2.waitKey(30) & 0xFF == ord('q'):
+                    quit_req = True
+                    break
+            
+            if quit_req:
                 break
 
             if args.once:
@@ -137,7 +162,8 @@ def main():
         fps = frame_count / elapsed if elapsed > 0 else 0
         print(f"\n[FIM] Total: {frame_count} frames em {elapsed:.1f}s ({fps:.1f} FPS)")
         cap.release()
-        ser.close()
+        if ser is not None:
+            ser.close()
         cv2.destroyAllWindows()
 
 

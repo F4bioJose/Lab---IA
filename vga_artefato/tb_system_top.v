@@ -3,7 +3,7 @@
 // ==============================================================================
 // Módulo: tb_system_top (Testbench)
 // Descrição: Simula o pipeline UART → Framebuffer → VGA completo.
-//            Envia 1024 bytes via protocolo UART simulado e verifica que o
+//            Envia 307200 bytes via protocolo UART simulado e verifica que o
 //            framebuffer é preenchido e o VGA renderiza corretamente.
 // ==============================================================================
 module tb_system_top;
@@ -23,7 +23,7 @@ module tb_system_top;
     wire [9:0]  LEDR;
 
     // Memória local para a imagem de teste
-    reg [7:0] img_mem [0:1023];
+    reg [7:0] img_mem [0:307199];
     integer i;
 
     // Instanciação do DUT
@@ -79,8 +79,8 @@ module tb_system_top;
         UART_RXD = 1'b1;        // Linha idle
 
         // Carrega imagem de teste (gradiente para verificação visual)
-        for (i = 0; i < 1024; i = i + 1) begin
-            img_mem[i] = i[7:0];  // Gradiente 0-255 repetido 4 vezes
+        for (i = 0; i < 307200; i = i + 1) begin
+            img_mem[i] = i[7:0];
         end
 
         // Reset
@@ -88,13 +88,13 @@ module tb_system_top;
         KEY = 1'b1;                 // Libera reset
         #100;
 
-        $display("[%0t] Iniciando envio UART de 1024 bytes...", $time);
+        $display("[%0t] Iniciando envio UART de 307200 bytes...", $time);
 
-        // Envia os 1024 bytes da imagem via UART
-        for (i = 0; i < 1024; i = i + 1) begin
+        // Envia os 307200 bytes da imagem via UART
+        for (i = 0; i < 307200; i = i + 1) begin
             send_uart_byte(img_mem[i]);
-            if (i % 256 == 0)
-                $display("[%0t]   Byte %0d / 1024 enviado", $time, i);
+            if (i % 65536 == 0)
+                $display("[%0t]   Byte %0d / 307200 enviado", $time, i);
         end
 
         $display("[%0t] Envio completo! frame_received = %b", $time, LEDG);
@@ -104,10 +104,10 @@ module tb_system_top;
 
         // Verifica que o framebuffer contém os dados corretos
         $display("--- Verificacao do Framebuffer ---");
-        $display("  frame_mem[0]   = %0d (esperado: 0)",   uut.frame_mem[0]);
-        $display("  frame_mem[127] = %0d (esperado: 127)", uut.frame_mem[127]);
-        $display("  frame_mem[255] = %0d (esperado: 255)", uut.frame_mem[255]);
-        $display("  frame_mem[1023]= %0d (esperado: 255)", uut.frame_mem[1023]);
+        $display("  frame_mem[0]      = %0d (esperado: 0)",   uut.framebuffer.mem[0]);
+        $display("  frame_mem[127]    = %0d (esperado: 127)", uut.framebuffer.mem[127]);
+        $display("  frame_mem[255]    = %0d (esperado: 255)", uut.framebuffer.mem[255]);
+        $display("  frame_mem[307199] = %0d (esperado: 255)", uut.framebuffer.mem[307199]);
         $display("  LEDG (frame_received) = %b", LEDG);
 
         $display("--- Simulacao concluida com sucesso ---");
@@ -124,7 +124,7 @@ module tb_system_top;
     // Monitor de progresso da UART
     always @(posedge CLOCK_50) begin
         if (uut.uart_valid)
-            if (uut.uart_wr_addr < 3 || uut.uart_wr_addr > 1020)
+            if (uut.uart_wr_addr < 3 || uut.uart_wr_addr > 307196)
                 $display("[%0t] UART byte recebido: addr=%0d data=0x%02h",
                     $time, uut.uart_wr_addr, uut.uart_data);
     end

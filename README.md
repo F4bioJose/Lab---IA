@@ -1,21 +1,21 @@
 # Artefato 3 — Pipeline UART → VGA (DE2-115)
 
-Sistema sintetizável para a placa DE2-115 (Cyclone IV E) que recebe uma imagem 32×32 em escala de cinza via UART serial e a exibe em tempo real no monitor VGA com scaling 8× (256×256 pixels centrados em 640×480).
+Sistema sintetizável para a placa DE2-115 (Cyclone IV E) que recebe uma imagem da webcam em resolução nativa VGA (640×480 em escala de cinza) via UART serial e a exibe em tempo real no monitor em tela cheia (mapeamento 1:1).
 
 ## Arquitetura
 
 ```
 PC (Webcam + Python)  ──UART 115200 baud──▶  FPGA DE2-115  ──VGA 640×480──▶  Monitor
-                          1024 bytes/frame     uart_rx → BRAM → VGA Controller
+                          307.200 bytes/frame   uart_rx → BRAM → VGA Controller
 ```
 
 | Bloco | Módulo | Clock | Função |
 |-------|--------|-------|--------|
 | UART RX | `uart_rx.v` | 50 MHz | Recebe bytes seriais a 115200 baud |
-| Framebuffer | Inline em `system_top.v` | 50/25 MHz | BRAM dual-port 1024×8 (escrita@50, leitura@25) |
+| Framebuffer | Inline em `system_top.v` | 50/25 MHz | BRAM dual-port 307.200×8 (escrita@50, leitura@25) |
 | PLL | `vga_pll.v` | — | Converte 50 MHz → 25.175 MHz (pixel clock) |
 | VGA Sync | `vga_sync.v` | 25 MHz | Gera timing 640×480 @ 60Hz (hsync, vsync) |
-| Rendering | Inline em `system_top.v` | 25 MHz | Scaling 8×, compensação de latência |
+| Rendering | Inline em `system_top.v` | 25 MHz | Tela cheia (1:1), compensação de latência |
 
 ## Estrutura de Arquivos
 
@@ -73,11 +73,11 @@ vvp sim_out
 
 Resultado esperado:
 ```
-frame_mem[0]   = 0   (esperado: 0)
-frame_mem[127] = 127 (esperado: 127)
-frame_mem[255] = 255 (esperado: 255)
-frame_mem[1023]= 255 (esperado: 255)
-LEDG[0] (frame_received) = 1
+  frame_mem[0]      = 0 (esperado: 0)
+  frame_mem[127]    = 127 (esperado: 127)
+  frame_mem[255]    = 255 (esperado: 255)
+  frame_mem[307199] = 255 (esperado: 255)
+  LEDG (frame_received) = 1
 --- Simulacao concluida com sucesso ---
 ```
 
