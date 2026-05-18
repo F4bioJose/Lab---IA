@@ -20,7 +20,7 @@ module vga_sync (
         else if (h_count == H_TOTAL) 
             h_count <= 0;
         else 
-            h_count <= h_count + 1;
+            h_count <= h_count + 10'd1;
     end
 
     // 2. Contador Vertical
@@ -31,7 +31,7 @@ module vga_sync (
             if (v_count == V_TOTAL) 
                 v_count <= 0;
             else 
-                v_count <= v_count + 1;            
+                v_count <= v_count + 10'd1;            
         end
     end
 

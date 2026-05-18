@@ -56,7 +56,7 @@ module uart_rx #(
                             state <= IDLE; // Foi falso alarme (ruido)
                         end
                     end else begin
-                        clock_count <= clock_count + 1;
+                        clock_count <= clock_count + 16'd1;
                     end
                 end
 
@@ -70,10 +70,10 @@ module uart_rx #(
                             state <= STOP;
                             bit_index <= 0;
                         end else begin
-                            bit_index <= bit_index + 1;
+                            bit_index <= bit_index + 3'd1;
                         end
                     end else begin
-                        clock_count <= clock_count + 1;
+                        clock_count <= clock_count + 16'd1;
                     end
                 end
 
@@ -84,7 +84,7 @@ module uart_rx #(
                         data_valid <= 1'b1;    // PRO FRAME BUFFER: PIXEL PRONTO
                         state <= IDLE;
                     end else begin
-                        clock_count <= clock_count + 1;
+                        clock_count <= clock_count + 16'd1;
                     end
                 end
             endcase
