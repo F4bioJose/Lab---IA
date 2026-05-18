@@ -135,17 +135,17 @@ set_instance_assignment -name IO_STANDARD "2.5 V" -to LEDR[*]
 # =========================================================================
 # CURRENT STRENGTH (Corrige warning 15714: Incomplete I/O / Missing Drive Strength)
 # =========================================================================
-set_instance_assignment -name CURRENT_STRENGTH_NEW 8mA -to VGA_CLK
-set_instance_assignment -name CURRENT_STRENGTH_NEW 8mA -to VGA_HS
-set_instance_assignment -name CURRENT_STRENGTH_NEW 8mA -to VGA_VS
-set_instance_assignment -name CURRENT_STRENGTH_NEW 8mA -to VGA_BLANK_N
-set_instance_assignment -name CURRENT_STRENGTH_NEW 8mA -to VGA_SYNC_N
-set_instance_assignment -name CURRENT_STRENGTH_NEW 8mA -to VGA_R[*]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 8mA -to VGA_G[*]
-set_instance_assignment -name CURRENT_STRENGTH_NEW 8mA -to VGA_B[*]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_CLK
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_HS
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_VS
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_BLANK_N
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_SYNC_N
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_R[*]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_G[*]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_B[*]
 
-set_instance_assignment -name CURRENT_STRENGTH_NEW 8mA -to LEDG
-set_instance_assignment -name CURRENT_STRENGTH_NEW 8mA -to LEDR[*]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to LEDG
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to LEDR[*]
 
 # =========================================================================
 # SLEW RATE (Corrige warning 15714: Incomplete I/O / Missing Slew Rate)

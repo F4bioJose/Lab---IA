@@ -25,7 +25,7 @@ import serial
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Envia frames da webcam (32x32 grayscale) via UART para a FPGA."
+        description="Envia frames da webcam (640x480 grayscale) via UART para a FPGA."
     )
     parser.add_argument(
         "--port", default="/dev/ttyUSB0",
@@ -50,10 +50,10 @@ def parse_args():
     return parser.parse_args()
 
 
-def send_frame(ser: serial.Serial, frame_32x32: np.ndarray):
-    """Envia um frame 32×32 (1024 bytes) via serial."""
-    raw_bytes = frame_32x32.astype(np.uint8).tobytes()
-    assert len(raw_bytes) == 1024, f"Frame deve ter 1024 bytes, tem {len(raw_bytes)}"
+def send_frame(ser: serial.Serial, frame: np.ndarray):
+    """Envia um frame 640x480 (307.200 bytes) via serial."""
+    raw_bytes = frame.astype(np.uint8).tobytes()
+    assert len(raw_bytes) == 307200, f"Frame deve ter 307200 bytes, tem {len(raw_bytes)}"
     ser.write(raw_bytes)
     ser.flush()
 
@@ -78,9 +78,9 @@ def main():
         if img is None:
             print(f"[ERRO] Não foi possível ler {args.file}")
             sys.exit(1)
-        small = cv2.resize(img, (32, 32), interpolation=cv2.INTER_AREA)
-        send_frame(ser, small)
-        print(f"[OK] Imagem '{args.file}' enviada ({small.shape})")
+        frame = cv2.resize(img, (640, 480), interpolation=cv2.INTER_AREA)
+        send_frame(ser, frame)
+        print(f"[OK] Imagem '{args.file}' enviada ({frame.shape})")
         ser.close()
         return
 
@@ -102,17 +102,16 @@ def main():
                 print("[AVISO] Falha na captura, tentando novamente...")
                 continue
 
-            # Converte para grayscale e redimensiona para 32×32
+            # Converte para grayscale e redimensiona para 640x480
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            small = cv2.resize(gray, (32, 32), interpolation=cv2.INTER_AREA)
+            out_frame = cv2.resize(gray, (640, 480), interpolation=cv2.INTER_AREA)
 
             # Envia via UART
-            send_frame(ser, small)
+            send_frame(ser, out_frame)
             frame_count += 1
 
             # Exibe preview no PC
-            preview = cv2.resize(small, (256, 256), interpolation=cv2.INTER_NEAREST)
-            cv2.imshow("Enviando para FPGA (32x32)", preview)
+            cv2.imshow("Enviando para FPGA (640x480)", out_frame)
 
             # Mostra FPS a cada 30 frames
             if frame_count % 30 == 0:
@@ -120,8 +119,8 @@ def main():
                 fps = frame_count / elapsed if elapsed > 0 else 0
                 print(f"  Frames enviados: {frame_count} | FPS: {fps:.1f}")
 
-            # Delay para dar tempo à UART de transmitir (1024 bytes × 10 bits / baud)
-            tx_time = (1024 * 10) / args.baud
+            # Delay para dar tempo à UART de transmitir (307.200 bytes × 10 bits / baud)
+            tx_time = (307200 * 10) / args.baud
             time.sleep(max(0, tx_time - 0.001))  # Margem de 1ms
 
             if cv2.waitKey(1) & 0xFF == ord('q'):

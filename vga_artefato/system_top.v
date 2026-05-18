@@ -41,7 +41,7 @@ module system_top (
     wire [7:0] uart_data;
     wire       uart_valid;
     reg  [1:0] rx_sync;             // Double-sync anti-metaestabilidade
-    reg  [9:0] uart_wr_addr;        // Endereço de escrita auto-incrementado
+    reg  [18:0] uart_wr_addr;        // Endereço de escrita auto-incrementado
     reg        frame_received;      // Flag: pelo menos 1 frame completo recebido
 
     // VGA timing
@@ -132,16 +132,16 @@ module system_top (
     //    simultâneas no mesmo endereço retornam valor indeterminado — aceitável
     //    pois o próximo frame sobreescreve imediatamente).
     // =========================================================================
-    reg [9:0] fb_rd_addr;
+    reg [18:0] fb_rd_addr;
 
     altsyncram #(
         .operation_mode                 ("DUAL_PORT"),
         .width_a                        (8),
-        .widthad_a                      (10),
-        .numwords_a                     (1024),
+        .widthad_a                      (19),
+        .numwords_a                     (307200),
         .width_b                        (8),
-        .widthad_b                      (10),
-        .numwords_b                     (1024),
+        .widthad_b                      (19),
+        .numwords_b                     (307200),
         .address_reg_b                  ("CLOCK1"),
         .outdata_reg_b                  ("CLOCK1"),
         .clock_enable_input_a           ("BYPASS"),
@@ -186,14 +186,14 @@ module system_top (
     // Controle de endereço de escrita UART
     always @(posedge CLOCK_50) begin
         if (reset) begin
-            uart_wr_addr   <= 10'd0;
+            uart_wr_addr   <= 19'd0;
             frame_received <= 1'b0;
         end else if (uart_valid) begin
-            if (uart_wr_addr == 10'd1023) begin
-                uart_wr_addr   <= 10'd0;
+            if (uart_wr_addr == 19'd307199) begin
+                uart_wr_addr   <= 19'd0;
                 frame_received <= 1'b1;
             end else begin
-                uart_wr_addr <= uart_wr_addr + 10'd1;
+                uart_wr_addr <= uart_wr_addr + 19'd1;
             end
         end
     end
@@ -212,30 +212,21 @@ module system_top (
     );
 
     // =========================================================================
-    // 5. MAPEAMENTO DE COORDENADAS — Scaling 8× (32×32 → 256×256)
+    // 5. MAPEAMENTO DE COORDENADAS — Tela Cheia (640x480)
     // =========================================================================
-    // Imagem centralizada na tela 640×480:
-    //   X_START = (640 - 256) / 2 = 192
-    //   Y_START = (480 - 256) / 2 = 112
-    localparam IMG_X_START = 10'd192;
-    localparam IMG_Y_START = 10'd112;
-    localparam IMG_SIZE    = 10'd256;  // 32 × 8
+    // A imagem preenche a tela inteira.
+    // Endereço linear: pixel_y * 640 + pixel_x
+    // Otimização: 640 = 512 + 128 = (pixel_y << 9) + (pixel_y << 7)
+    wire [18:0] y_times_640 = (pixel_y << 9) + (pixel_y << 7);
+    
+    wire in_image = (pixel_x < 10'd640) && (pixel_y < 10'd480);
 
-    wire in_image = (pixel_x >= IMG_X_START) && (pixel_x < IMG_X_START + IMG_SIZE) &&
-                    (pixel_y >= IMG_Y_START) && (pixel_y < IMG_Y_START + IMG_SIZE);
-
-    // Coordenadas da imagem 32×32 via divisão por 8 (bits [7:3] do offset)
-    wire [9:0] offset_x = pixel_x - IMG_X_START;
-    wire [9:0] offset_y = pixel_y - IMG_Y_START;
-    wire [4:0] img_x = offset_x[7:3];  // equivalente a >> 3, sem truncamento
-    wire [4:0] img_y = offset_y[7:3];
-
-    // Endereço linear no framebuffer: img_y * 32 + img_x = {img_y, img_x}
+    // Endereço linear no framebuffer
     always @(*) begin
         if (in_image)
-            fb_rd_addr = {img_y, img_x};
+            fb_rd_addr = y_times_640 + pixel_x;
         else
-            fb_rd_addr = 10'd0;
+            fb_rd_addr = 19'd0;
     end
 
     // =========================================================================
