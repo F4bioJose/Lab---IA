@@ -1,0 +1,13 @@
+work/
+db/
+incremental_db/
+output_files/
+simulation/
+*.rpt
+*.smsg
+*.summary
+*.done
+*.pin
+*.jdi
+*.wlf
+modelsim.ini
