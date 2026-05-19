@@ -30,7 +30,7 @@ import serial
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Envia frames da webcam (640x480 grayscale) via UART para a FPGA."
+        description="Envia frames da webcam (128x128 grayscale) via UART para a FPGA."
     )
     parser.add_argument(
         "--port", default="/dev/ttyUSB0",
@@ -60,9 +60,9 @@ def parse_args():
 
 
 def send_frame(ser, frame: np.ndarray):
-    """Envia um frame 640x480 (307.200 bytes) via serial."""
+    """Envia um frame 128x128 (16384 bytes) via serial."""
     raw_bytes = frame.astype(np.uint8).tobytes()
-    assert len(raw_bytes) == 307200, f"Frame deve ter 307200 bytes, tem {len(raw_bytes)}"
+    assert len(raw_bytes) == 16384, f"Frame deve ter 16384 bytes, tem {len(raw_bytes)}"
     if ser is not None:
         ser.write(raw_bytes)
         ser.flush()
@@ -93,7 +93,7 @@ def main():
         if img is None:
             print(f"[ERRO] Não foi possível ler {args.file}")
             sys.exit(1)
-        frame = cv2.resize(img, (640, 480), interpolation=cv2.INTER_AREA)
+        frame = cv2.resize(img, (128, 128), interpolation=cv2.INTER_AREA)
         send_frame(ser, frame)
         print(f"[OK] Imagem '{args.file}' enviada ({frame.shape})")
         if ser is not None:
@@ -118,9 +118,9 @@ def main():
                 print("[AVISO] Falha na captura, tentando novamente...")
                 continue
 
-            # Converte para grayscale e redimensiona para 640x480
+            # Converte para grayscale e redimensiona para 128x128
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            out_frame = cv2.resize(gray, (640, 480), interpolation=cv2.INTER_AREA)
+            out_frame = cv2.resize(gray, (128, 128), interpolation=cv2.INTER_AREA)
 
             # Envia via UART o frame capturado
             send_frame(ser, out_frame)
@@ -131,8 +131,8 @@ def main():
             fps = frame_count / elapsed if elapsed > 0 else 0
             print(f"  Frames enviados: {frame_count} | Tempo decorrido: {elapsed:.1f}s")
 
-            # Delay para dar tempo à UART de transmitir (~26 segundos para 640x480)
-            tx_time = (307200 * 10) / args.baud
+            # Delay para dar tempo à UART de transmitir (~1.4 segundos para 128x128)
+            tx_time = (16384 * 10) / args.baud
             
             # Durante a espera da UART, mantemos a câmera gravando e exibindo para o preview ficar fluido a 30 FPS!
             t_end = time.time() + max(0, tx_time - 0.001)
@@ -140,11 +140,11 @@ def main():
             while time.time() < t_end:
                 ret_live, live_frame = cap.read()
                 if ret_live:
-                    live_gray = cv2.cvtColor(live_frame, cv2.COLOR_BGR2GRAY)
-                    live_out = cv2.resize(live_gray, (640, 480), interpolation=cv2.INTER_AREA)
-                    cv2.imshow("Preview ao vivo da Webcam (aguardando envio...)", live_out)
+                    # Mostra o preview em tamanho maior para facilitar a visualização
+                    preview_frame = cv2.resize(live_frame, (320, 240), interpolation=cv2.INTER_NEAREST)
+                    cv2.imshow("Preview ao vivo da Webcam (aguardando envio...)", preview_frame)
                 
-                if cv2.waitKey(30) & 0xFF == ord('q'):
+                if cv2.waitKey(1) & 0xFF == ord('q'): # waitKey(1) para ~30fps
                     quit_req = True
                     break
             

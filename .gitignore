@@ -4,9 +4,11 @@ db/
 incremental_db/
 output_files/
 simulation/
+sim_out/
 greybox_tmp/
 *.rpt
 *.qdf
+*.qws
 *.smsg
 *.summary
 *.done

@@ -41,7 +41,7 @@ module system_top (
     wire [7:0] uart_data;
     wire       uart_valid;
     reg  [1:0] rx_sync;             // Double-sync anti-metaestabilidade
-    reg  [18:0] uart_wr_addr;        // Endereço de escrita auto-incrementado
+    reg [13:0] uart_wr_addr;        // Endereço de escrita auto-incrementado
     reg        frame_received;      // Flag: pelo menos 1 frame completo recebido
 
     // VGA timing
@@ -124,35 +124,25 @@ module system_top (
     );
 
     // =========================================================================
-    // 3. FRAMEBUFFER: altsyncram dual-port explícito (1024 × 8 bits)
+    // 3. FRAMEBUFFER: altsyncram dual-port explícito (16384 × 8 bits)
     //    - Porta A (escrita): domínio CLOCK_50 (UART)
     //    - Porta B (leitura): domínio clk_25mhz (VGA)
-    //    Usando IP altsyncram com read_during_write = DONT_CARE, que é o
-    //    comportamento correto para um framebuffer de vídeo (leitura e escrita
-    //    simultâneas no mesmo endereço retornam valor indeterminado — aceitável
-    //    pois o próximo frame sobreescreve imediatamente).
     // =========================================================================
-    reg [18:0] fb_rd_addr;
+    reg [13:0] fb_rd_addr;
 
     altsyncram #(
         .operation_mode                 ("DUAL_PORT"),
         .width_a                        (8),
-        .widthad_a                      (19),
-        .numwords_a                     (307200),
+        .widthad_a                      (14),
+        .numwords_a                     (16384),
         .width_b                        (8),
-        .widthad_b                      (19),
-        .numwords_b                     (307200),
+        .widthad_b                      (14),
+        .numwords_b                     (16384),
         .address_reg_b                  ("CLOCK1"),
         .outdata_reg_b                  ("CLOCK1"),
-        .clock_enable_input_a           ("BYPASS"),
-        .clock_enable_input_b           ("BYPASS"),
-        .clock_enable_output_b          ("BYPASS"),
         .intended_device_family         ("Cyclone IV E"),
         .lpm_type                       ("altsyncram"),
-        .power_up_uninitialized         ("FALSE"),
-        .ram_block_type                 ("AUTO"),
-        .read_during_write_mode_mixed_ports ("DONT_CARE"),
-        .width_byteena_a               (1)
+        .read_during_write_mode_mixed_ports ("DONT_CARE")
     ) framebuffer (
         // Porta A — Escrita (50 MHz, UART)
         .clock0      (CLOCK_50),
@@ -163,37 +153,20 @@ module system_top (
         // Porta B — Leitura (25 MHz, VGA)
         .clock1      (clk_25mhz),
         .address_b   (fb_rd_addr),
-        .q_b         (fb_rd_data),
-
-        // Portas não utilizadas — tied off
-        .aclr0       (1'b0),
-        .aclr1       (1'b0),
-        .addressstall_a (1'b0),
-        .addressstall_b (1'b0),
-        .byteena_a   (1'b1),
-        .clocken0    (1'b1),
-        .clocken1    (1'b1),
-        .clocken2    (1'b1),
-        .clocken3    (1'b1),
-        .data_b      ({8{1'b1}}),
-        .eccstatus   (),
-        .q_a         (),
-        .rden_a      (1'b1),
-        .rden_b      (1'b1),
-        .wren_b      (1'b0)
+        .q_b         (fb_rd_data)
     );
 
     // Controle de endereço de escrita UART
     always @(posedge CLOCK_50) begin
         if (reset) begin
-            uart_wr_addr   <= 19'd0;
+            uart_wr_addr   <= 14'd0;
             frame_received <= 1'b0;
         end else if (uart_valid) begin
-            if (uart_wr_addr == 19'd307199) begin
-                uart_wr_addr   <= 19'd0;
+            if (uart_wr_addr == 14'd16383) begin // 128*128 - 1
+                uart_wr_addr   <= 14'd0;
                 frame_received <= 1'b1;
             end else begin
-                uart_wr_addr <= uart_wr_addr + 19'd1;
+                uart_wr_addr <= uart_wr_addr + 1'b1;
             end
         end
     end
@@ -212,21 +185,32 @@ module system_top (
     );
 
     // =========================================================================
-    // 5. MAPEAMENTO DE COORDENADAS — Tela Cheia (640x480)
+    // 5. MAPEAMENTO DE COORDENADAS — Imagem 128x128 (sem scaling)
     // =========================================================================
-    // A imagem preenche a tela inteira.
-    // Endereço linear: pixel_y * 640 + pixel_x
-    // Otimização: 640 = 512 + 128 = (pixel_y << 9) + (pixel_y << 7)
-    wire [18:0] y_times_640 = (pixel_y << 9) + (pixel_y << 7);
-    
-    wire in_image = (pixel_x < 10'd640) && (pixel_y < 10'd480);
+    // A imagem original tem 128x128 pixels e é exibida 1:1.
+    // A imagem é centralizada na tela de 640x480.
+    localparam IMG_WIDTH  = 128;
+    localparam IMG_HEIGHT = 128;
+    localparam H_OFFSET   = (640 - IMG_WIDTH) / 2;  // 256
+    localparam V_OFFSET   = (480 - IMG_HEIGHT) / 2; // 176
 
-    // Endereço linear no framebuffer
+    wire [6:0] fb_x;
+    wire [6:0] fb_y;
+    
+    // Mapeia as coordenadas da tela para as do framebuffer (subtraindo o offset)
+    assign fb_x = pixel_x - H_OFFSET;
+    assign fb_y = pixel_y - V_OFFSET;
+
+    wire in_image = (pixel_x >= H_OFFSET) && (pixel_x < (H_OFFSET + IMG_WIDTH)) &&
+                    (pixel_y >= V_OFFSET) && (pixel_y < (V_OFFSET + IMG_HEIGHT));
+
+    // Endereço linear no framebuffer 128x128
+    // Endereço = y * 128 + x  (Otimização: y << 7)
     always @(*) begin
         if (in_image)
-            fb_rd_addr = y_times_640 + pixel_x;
+            fb_rd_addr = (fb_y << 7) + fb_x;
         else
-            fb_rd_addr = 19'd0;
+            fb_rd_addr = 14'd0;
     end
 
     // =========================================================================

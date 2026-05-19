@@ -10,7 +10,7 @@ module tb_system_top;
 
     // Parâmetros de simulação
     localparam CLK_PERIOD_NS = 20;       // 50 MHz
-    localparam BAUD_RATE     = 1000000;  // 1 Mbaud para acelerar simulação
+    localparam BAUD_RATE     = 10000000; // 10 Mbaud para acelerar simulação
     localparam BIT_PERIOD_NS = 1000000000 / BAUD_RATE;
 
     // Sinais do DUT

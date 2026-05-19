@@ -48,7 +48,7 @@ set_location_assignment PIN_M23 -to KEY
 
 
 # --- UART (RS-232 via MAX3232 transceiver na DE2-115) ---
-set_location_assignment PIN_G12 -to UART_RXD
+set_location_assignment PIN_AB21 -to UART_RXD
 
 # --- VGA (DAC ADV7123) ---
 set_location_assignment PIN_G13 -to VGA_HS
