@@ -40,6 +40,21 @@ HAAR_CASCADE_PATH = os.path.join(
     "haarcascade_frontalface_default.xml"
 )
 
+
+def resolve_haar_cascade_path():
+    """Resolve o caminho do Haarcascade sem depender de cv2.data."""
+    candidates = [
+        HAAR_CASCADE_PATH,
+        os.path.join(os.path.dirname(cv2.__file__), "data", "haarcascade_frontalface_default.xml"),
+        "/usr/share/opencv4/haarcascades/haarcascade_frontalface_default.xml",
+        "/usr/share/opencv/haarcascades/haarcascade_frontalface_default.xml",
+    ]
+
+    for candidate in candidates:
+        if candidate and os.path.isfile(candidate):
+            return candidate
+    return None
+
 # Resolução da imagem enviada (32×32 = 1024 bytes)
 IMG_SIZE = 32
 FRAME_BYTES = IMG_SIZE * IMG_SIZE  # 1024
@@ -81,6 +96,10 @@ def parse_args():
         "--preview", action="store_true",
         help="Mostrar preview da imagem enviada"
     )
+    parser.add_argument(
+        "--raw", action="store_true",
+        help="Enviar bytes crus (sem quantizar para Q1.7)"
+    )
     return parser.parse_args()
 
 
@@ -94,6 +113,12 @@ def send_frame(ser, frame: np.ndarray):
         ser.write(raw_bytes)
         ser.flush()
     return raw_bytes
+
+
+def quantize_to_q17(frame_u8: np.ndarray) -> np.ndarray:
+    """Converte 0..255 (uint8) para Q1.7 positivo (0..127)."""
+    scaled = np.round(frame_u8.astype(np.float32) * 127.0 / 255.0)
+    return np.clip(scaled, 0, 127).astype(np.uint8)
 
 
 def load_hex_file(filepath):
@@ -151,16 +176,12 @@ def main():
     # Carrega o classificador Haarcascade
     face_cascade = None
     if not args.no_haar and not args.hex:
-        if not os.path.isfile(HAAR_CASCADE_PATH):
-            alt_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-            if os.path.isfile(alt_path):
-                face_cascade = cv2.CascadeClassifier(alt_path)
-                print(f"[OK] Haarcascade carregado (caminho padrão OpenCV)")
-            else:
-                print("[AVISO] Haarcascade não encontrado. Detecção de rosto desabilitada.")
+        cascade_path = resolve_haar_cascade_path()
+        if cascade_path is not None:
+            face_cascade = cv2.CascadeClassifier(cascade_path)
+            print(f"[OK] Haarcascade carregado: {cascade_path}")
         else:
-            face_cascade = cv2.CascadeClassifier(HAAR_CASCADE_PATH)
-            print(f"[OK] Haarcascade carregado com sucesso")
+            print("[AVISO] Haarcascade não encontrado. Detecção de rosto desabilitada.")
 
         if face_cascade is not None and face_cascade.empty():
             print("[AVISO] Falha ao carregar Haarcascade. Detecção desabilitada.")
@@ -212,6 +233,9 @@ def main():
                                interpolation=cv2.INTER_AREA)
 
         # Envia o frame
+        if not args.raw and not args.hex:
+            frame = quantize_to_q17(frame)
+            print("[OK] Frame quantizado para Q1.7 (0..127)")
         t0 = time.time()
         raw = send_frame(ser, frame)
         elapsed = time.time() - t0
@@ -270,6 +294,9 @@ def main():
                           interpolation=cv2.INTER_AREA)
 
     # Envia o frame
+    if not args.raw:
+        frame_32 = quantize_to_q17(frame_32)
+        print("[OK] Frame quantizado para Q1.7 (0..127)")
     t0 = time.time()
     raw = send_frame(ser, frame_32)
     elapsed = time.time() - t0

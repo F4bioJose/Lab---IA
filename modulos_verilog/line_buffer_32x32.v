@@ -23,18 +23,16 @@ module line_buffer_32x32 (
     reg [5:0] in_x;
     reg [5:0] in_y;
 
-    integer i;
-
     always @(posedge clk or posedge rst) begin
         if (rst) begin
             in_x <= 6'd0;
             in_y <= 6'd0;
             window_valid <= 1'b0;
-            for (i = 0; i < 32; i = i + 1) begin
+            for (integer i = 0; i < 32; i = i + 1) begin
                 row1[i] <= 8'd0;
                 row2[i] <= 8'd0;
             end
-            for (i = 0; i < 9; i = i + 1) begin
+            for (integer i = 0; i < 9; i = i + 1) begin
                 win[i] <= 8'd0;
             end
         end else begin

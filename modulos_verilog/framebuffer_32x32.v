@@ -40,17 +40,11 @@ module framebuffer_32x32 (
     reg [7:0] mem_a [0:1023];
     reg [7:0] mem_b [0:1023];
 
-    integer i;
-
     always @(posedge clk or posedge rst) begin
         if (rst) begin
             rd_data <= 8'd0;
             vga_rd_data <= 8'd0;
             frame_ready <= 1'b0;
-            for (i = 0; i < 1024; i = i + 1) begin
-                mem_a[i] <= 8'd0;
-                mem_b[i] <= 8'd0;
-            end
         end else begin
             if (frame_clear) begin
                 frame_ready <= 1'b0; // Limpa a flag de frame pronto

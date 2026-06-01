@@ -17,13 +17,9 @@ module max_pooling_design (
 );
 
     reg signed [15:0] row1_f0 [0:29];
-    reg signed [15:0] row2_f0 [0:29];
     reg signed [15:0] row1_f1 [0:29];
-    reg signed [15:0] row2_f1 [0:29];
     reg signed [15:0] row1_f2 [0:29];
-    reg signed [15:0] row2_f2 [0:29];
     reg signed [15:0] row1_f3 [0:29];
-    reg signed [15:0] row2_f3 [0:29];
 
     reg signed [15:0] prev_row_prev_f0;
     reg signed [15:0] prev_row_prev_f1;
@@ -69,8 +65,6 @@ module max_pooling_design (
     assign fifo_push = pool_event && !fifo_full;
     assign fifo_pop = (!pending) && !fifo_empty;
 
-    integer i;
-
     always @(posedge clk or posedge rst) begin
         if (rst) begin
             x <= 6'd0;
@@ -91,15 +85,11 @@ module max_pooling_design (
             pending <= 1'b0;
             valid_out <= 1'b0;
             data_out <= 16'sd0;
-            for (i = 0; i < 30; i = i + 1) begin
+            for (integer i = 0; i < 30; i = i + 1) begin
                 row1_f0[i] <= 16'sd0;
-                row2_f0[i] <= 16'sd0;
                 row1_f1[i] <= 16'sd0;
-                row2_f1[i] <= 16'sd0;
                 row1_f2[i] <= 16'sd0;
-                row2_f2[i] <= 16'sd0;
                 row1_f3[i] <= 16'sd0;
-                row2_f3[i] <= 16'sd0;
             end
         end else begin
             valid_out <= 1'b0;

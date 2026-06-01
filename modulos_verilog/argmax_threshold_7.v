@@ -6,7 +6,8 @@
 // ==============================================================================
 module argmax_threshold_7 #(
     // Limiar de aceitação em formato ponto fixo Q2.14 (ex: 0.7 de confiança)
-    parameter signed [15:0] THRESH_Q2_14 = 16'sd11469
+    parameter signed [15:0] THRESH_Q2_14 = 16'sd11469,
+    parameter bit BYPASS_THRESHOLD = 1'b0
 )(
     input wire clk,
     input wire rst,
@@ -46,7 +47,10 @@ module argmax_threshold_7 #(
                 max_score <= max_val;
                 
                 // Avalia se o score máximo superou o limiar de aceitação predefinido
-                if (max_val < THRESH_Q2_14) begin
+                if (BYPASS_THRESHOLD) begin
+                    class_id <= max_idx;
+                    unknown <= 1'b0;
+                end else if (max_val < THRESH_Q2_14) begin
                     class_id <= 3'd7; // ID 7 reservado para classificação incerta/desconhecida
                     unknown <= 1'b1;
                 end else begin

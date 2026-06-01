@@ -48,6 +48,8 @@ module fpga_top_de2115 (
     wire        unknown;
     wire        access_done;
     wire        frame_ready;
+    wire        debug_weights_nonzero;
+    wire        debug_frame_nonzero;
 
     // Portas não utilizadas nesta fase (VGA)
     wire [7:0]  vga_rd_data;
@@ -100,7 +102,9 @@ module fpga_top_de2115 (
         .class_id      (class_id),
         .unknown       (unknown),
         .access_done   (access_done),
-        .frame_ready   (frame_ready)
+        .frame_ready   (frame_ready),
+        .debug_weights_nonzero (debug_weights_nonzero),
+        .debug_frame_nonzero   (debug_frame_nonzero)
     );
 
     // =========================================================================
@@ -116,7 +120,9 @@ module fpga_top_de2115 (
             if (access_done) begin
                 // Captura o resultado no instante exato do access_done
                 LEDG[2:0] <= class_id;
-                LEDG[5:3] <= 3'b000;        // Reservados
+                LEDG[5]   <= debug_weights_nonzero;
+                LEDG[4]   <= debug_frame_nonzero;
+                LEDG[3]   <= 1'b0;
                 LEDG[6]   <= 1'b1;          // Sinaliza inferência concluída
                 LEDG[7]   <= unknown;
             end

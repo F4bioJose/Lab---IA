@@ -20,15 +20,15 @@ module uart_rx #(
     localparam STOP  = 2'b11;
 
     reg [1:0] state = IDLE;
-    reg [15:0] clock_count = 0;
-    reg [2:0] bit_index = 0;   // Conta qual bit estamos lendo (0 a 7)
-    reg [7:0] shift_reg = 0;   // Guarda temporariamente os bits recebidos
+    reg [15:0] clock_count = 16'd0;
+    reg [2:0] bit_index = 3'd0;   // Conta qual bit estamos lendo (0 a 7)
+    reg [7:0] shift_reg = 8'd0;   // Guarda temporariamente os bits recebidos
 
     always @(posedge clk) begin
         if (rst) begin
             state <= IDLE;
-            clock_count <= 0;
-            bit_index <= 0;
+            clock_count <= 16'd0;
+            bit_index <= 3'd0;
             data_valid <= 1'b0;
             data_out <= 8'h00;
         end else begin
@@ -37,8 +37,8 @@ module uart_rx #(
 
             case (state)
                 IDLE: begin
-                    clock_count <= 0;
-                    bit_index <= 0;
+                    clock_count <= 16'd0;
+                    bit_index <= 3'd0;
                     // A linha serial fica em 1 quando ociosa.
                     // 0 indica o Start Bit (inicio da transmissao)
                     if (rx_pin == 1'b0) begin
@@ -50,30 +50,30 @@ module uart_rx #(
                     // Espera chegar no meio do Start Bit para confirmar que nao e ruido
                     if (clock_count == (CYCLES_PER_BIT / 2)) begin
                         if (rx_pin == 1'b0) begin
-                            clock_count <= 0;
+                            clock_count <= 16'd0;
                             state <= DATA;
                         end else begin
                             state <= IDLE; // Foi falso alarme (ruido)
                         end
                     end else begin
-                        clock_count <= clock_count + 1;
+                        clock_count <= clock_count + 16'd1;
                     end
                 end
 
                 DATA: begin
                     // Espera o tempo de 1 bit inteiro para ler no meio do sinal
                     if (clock_count == CYCLES_PER_BIT - 1) begin
-                        clock_count <= 0;
+                        clock_count <= 16'd0;
                         shift_reg[bit_index] <= rx_pin; // Salva o bit lido
 
-                        if (bit_index == 7) begin
+                        if (bit_index == 3'd7) begin
                             state <= STOP;
-                            bit_index <= 0;
+                            bit_index <= 3'd0;
                         end else begin
-                            bit_index <= bit_index + 1;
+                            bit_index <= bit_index + 3'd1;
                         end
                     end else begin
-                        clock_count <= clock_count + 1;
+                        clock_count <= clock_count + 16'd1;
                     end
                 end
 
@@ -84,7 +84,7 @@ module uart_rx #(
                         data_valid <= 1'b1;    // PRO FRAME BUFFER: PIXEL PRONTO
                         state <= IDLE;
                     end else begin
-                        clock_count <= clock_count + 1;
+                        clock_count <= clock_count + 16'd1;
                     end
                 end
             endcase

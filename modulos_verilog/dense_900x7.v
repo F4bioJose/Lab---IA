@@ -68,7 +68,7 @@ module dense_900x7_scores #(
                         if (linear_q2_14[c] > SAT_MAX_Q2_14) begin
                             scores[c] <= 16'sd32767;
                         end else if (linear_q2_14[c] < SAT_MIN_Q2_14) begin
-                            scores[c] <= -16'sd32768;
+                            scores[c] <= 16'sh8000;
                         end else begin
                             scores[c] <= linear_q2_14[c][15:0];
                         end

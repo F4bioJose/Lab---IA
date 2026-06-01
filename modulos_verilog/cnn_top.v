@@ -36,7 +36,9 @@ module cnn_top (
     output wire [2:0] class_id,
     output wire unknown,
     output reg access_done,
-    output wire frame_ready
+    output wire frame_ready,
+    output wire debug_weights_nonzero,
+    output wire debug_frame_nonzero
 );
 
     // UART RX sincronizado para o clock interno
@@ -80,7 +82,8 @@ module cnn_top (
 
     wire signed [7:0] dense_w [0:6];
     wire signed [7:0] dense_b [0:6];
-    reg [9:0] dense_addr;
+    localparam integer DENSE_ADDR_WIDTH = 13;
+    reg [DENSE_ADDR_WIDTH-1:0] dense_addr;
 
     wire signed [7:0] conv_w0 [0:8];
     wire signed [7:0] conv_w1 [0:8];
@@ -97,6 +100,7 @@ module cnn_top (
 
     reg [10:0] rd_req_count;
     reg [10:0] rd_val_count;
+    reg [7:0] debug_or_acc;
 
     // Maquina de estados (FSM) principal para controle do pipeline
     localparam ST_IDLE  = 2'd0; // Estado inativo aguardando frame_ready
@@ -108,6 +112,11 @@ module cnn_top (
 
     // Evita o atraso de 1 ciclo que causaria off-by-one no endereço
     assign uart_wr_en_comb = uart_valid && (state == ST_IDLE) && !frame_ready && !uart_frame_pending;
+
+    assign debug_weights_nonzero = |{conv_b0, conv_b1, conv_b2, conv_b3,
+                                    dense_b[0], dense_b[1], dense_b[2], dense_b[3],
+                                    dense_b[4], dense_b[5], dense_b[6]};
+    assign debug_frame_nonzero = |debug_or_acc;
 
     // UART RX: converte serial em byte + pulso de dado valido
     uart_rx uart_rx_inst (
@@ -233,7 +242,9 @@ module cnn_top (
     );
 
     // 8. Argmax + Threshold: Identifica a predição dominante com limiar de confiança
-    argmax_threshold_7 argmax_inst (
+    argmax_threshold_7 #(
+        .BYPASS_THRESHOLD(1'b1)
+    ) argmax_inst (
         .clk(clk),
         .rst(rst),
         .valid_in(dense_valid),
@@ -257,7 +268,8 @@ module cnn_top (
             fb_rd_addr <= 10'd0;
             rd_req_count <= 11'd0;
             rd_val_count <= 11'd0;
-            dense_addr <= 10'd0;
+            dense_addr <= 13'd0;
+            debug_or_acc <= 8'd0;
             access_done <= 1'b0;
             frame_clear <= 1'b0;
         end else begin
@@ -286,18 +298,20 @@ module cnn_top (
 
             if (frame_clear) begin
                 uart_wr_addr <= 10'd0;
+                debug_or_acc <= 8'd0;
             end
 
             if (flat_valid) begin
-                if (dense_addr == 10'd899) begin
-                    dense_addr <= 10'd0;
+                if (dense_addr == 13'd899) begin
+                    dense_addr <= 13'd0;
                 end else begin
-                    dense_addr <= dense_addr + 10'd1;
+                    dense_addr <= dense_addr + 13'd1;
                 end
             end
 
             if (fb_rd_en_d && rd_val_count < 11'd1024) begin
                 rd_val_count <= rd_val_count + 11'd1;
+                debug_or_acc <= debug_or_acc | fb_rd_data;
             end
 
             case (state)
@@ -309,7 +323,7 @@ module cnn_top (
                     if (start_system_int && frame_ready) begin
                         state <= ST_READ;
                         frame_clear <= 1'b1;
-                        dense_addr <= 10'd0;
+                        dense_addr <= 13'd0;
                     end
                 end
 
