@@ -1,38 +1,141 @@
 # Tiny-CNN FPGA: Fechadura Biométrica Inteligente
 
-## Aviso: Dados Simulados (Status Atual)
+Implementação em hardware de uma Rede Neural Convolucional (CNN) na FPGA DE2-115 (Cyclone IV EP4CE115F29C7) para classificação biométrica facial. O sistema recebe uma imagem 32×32 em escala de cinza via comunicação serial UART, executa a inferência completa em pipeline de hardware dedicado e exibe o resultado da classificação nos LEDs verdes da placa.
 
-A finalidade desta etapa é atestar o arranjo arquitetural dos blocos, o tempo de ciclo dos processadores MAC e as garantias do formato de ponto fixo. Por esta razão:
+## Status Atual
 
-* **Pesos Fabricados:** O arquivo atual de inicialização da memória ROM de parâmetros (`weights_all.mif`), localizado em `modulos_verilog/`, carrega dados arbitrários gerados sinteticamente para validação dos fios. Ele **não provém** de uma rede neural formalmente treinada (TensorFlow/Keras).
-* **Entradas Aleatórias:** O vetor de processamento injetado através do simulador via testbench (ex: imagens dentro de `/inputs/`) também compõe matrizes hexadecimais aleatórias/sequenciais confeccionadas estritamente para submeter as instâncias a testes de sanidade geométrica (filtros 3x3, pooling 2x2, argmax), e não uma fotografia real proveniente de webcam.
+* **Pipeline Funcional em Hardware:** O fluxo completo de inferência está implementado e sintetizável — desde a recepção serial da imagem até a decisão final exibida nos LEDs.
+* **Pesos Sintéticos:** O arquivo de pesos (`weights_all.mif`) carrega dados gerados sinteticamente para validação estrutural. Para classificação real, deve ser substituído por pesos exportados do modelo TensorFlow/Keras treinado no notebook `pipeline_fechadura.ipynb`.
+* **Imagem de Teste:** O arquivo `inputs/teste2.txt` contém uma imagem hexadecimal para testes. Imagens reais podem ser enviadas via o script Python incluído.
+
+## Arquitetura do Sistema
+
+```
+PC (send_image_32x32.py)
+  │  1024 bytes via RS-232 (115200 baud)
+  ▼
+UART_RXD ──► uart_rx ──► Framebuffer 32×32
+                              │
+                    FSM auto-start (1024 bytes recebidos)
+                              │
+                              ▼
+                    Line Buffer ──► Conv 3×3 (4 filtros, ReLU)
+                                          │
+                                    Max Pooling 2×2
+                                          │
+                                      Flatten (900)
+                                          │
+                                   Dense 900×7 (7 classes)
+                                          │
+                                  Argmax + Threshold (0.7)
+                                          │
+                                  class_id ──► LEDG[2:0]
+                                  unknown  ──► LEDG[7]
+                                  done     ──► LEDG[6]
+```
 
 ## Estrutura de Diretórios
 
-* `modulos_verilog/`: Acomoda a totalidade dos blocos construtivos da rede. Inclui o orquestrador macro (`cnn_top.v`), o buffer de janelas, os núcleos convolucionais espacializados, módulo de max-pooling, a interface flatten, memória ROM compartilhada, camada densa preditiva e o cômputo da função de ativação Argmax com Threshold.
-* `scripts/`: Dispõe de rotinas em script TCL para ambiente ModelSim voltadas à automação de integração; agrupando tarefas de compilação dos módulos (`compile_project.do`) e as rotinas instanciadoras da simulação RTL de verificação (`run_project.do`).
-* `inputs/`: (A ser povoado) Reservado para estocar os tensores fotográficos transformados para valores hexadecimais puros, visando a injeção estática no simulador.
-* `explicacoes/`: Pasta dedicada à documentação estendida do projeto. Contém a explicação completa da arquitetura do pipeline (`pipeline.txt`) e o diagrama visual de transição da FSM principal (`FSM.md`).
+```
+Lab---IA/
+├── modulos_verilog/           # Módulos Verilog do pipeline CNN
+│   ├── fpga_top_de2115.v      # Wrapper top-level para síntese na DE2-115
+│   ├── cnn_top.v              # Orquestrador do pipeline (FSM + instâncias)
+│   ├── uart_rx.v              # Receptor serial UART (115200 baud)
+│   ├── framebuffer_32x32.v    # Buffer de imagem 32×32 (RAM dual-port)
+│   ├── line_buffer_32x32.v    # Buffer de linhas para janelas 3×3
+│   ├── convolucao_mac.v       # Convolução 3×3 (4 filtros + ReLU)
+│   ├── max_pooling_design.v   # Max Pooling 2×2 com FIFO
+│   ├── flatten.v              # Serialização de mapas 2D → vetor 1D
+│   ├── dense_900x7.v          # Camada densa (900 entradas × 7 classes)
+│   ├── argmax_threshold_7.v   # Decisão: argmax + limiar de confiança
+│   ├── weights_shared_rom.v   # ROM de pesos (6347 parâmetros Q1.7)
+│   ├── weights_all.mif        # Arquivo de inicialização dos pesos
+│   └── tb_fpga_top.v          # Testbench (simula envio UART completo)
+│
+├── quartus_cnn/               # Projeto Quartus Prime para síntese
+│   ├── cnn_inference.qpf      # Arquivo de projeto
+│   ├── cnn_inference.qsf      # Pin assignments e configurações
+│   └── cnn_inference.sdc      # Timing constraints (50 MHz)
+│
+├── scripts/                   # Scripts de automação
+│   ├── compile_project.do     # Compilação ModelSim (todos os módulos)
+│   ├── run_project.do         # Execução do testbench no ModelSim
+│   └── send_image_32x32.py    # Envio de imagem via UART (Python)
+│
+├── inputs/                    # Imagens de teste
+│   └── teste2.txt             # Imagem 32×32 em formato hexadecimal
+│
+├── explicacoes/               # Documentação técnica detalhada
+│   ├── pipeline.txt           # Descrição completa do pipeline e módulos
+│   └── FSM.md                 # Diagramas e explicação das FSMs
+│
+├── pipeline_fechadura.ipynb   # Notebook de treino do modelo (TensorFlow/Keras)
+└── README.md                  # Este arquivo
+```
 
-## Como Simular o Projeto (Validação RTL)
+## Como Simular (ModelSim)
 
-O ambiente de simulação no ModelSim está completamente automatizado através dos scripts TCL. Para executar o teste do pipeline:
+Pré-requisito: ModelSim instalado e imagem de teste em `inputs/teste2.txt`.
 
-1. Assegure-se de que a imagem de teste (vetor hexadecimal, ex: `teste2.txt`) encontra-se no diretório `inputs/`.
-2. Abra o terminal interativo do **ModelSim** garantindo que o diretório atual seja a raiz do repositório.
-3. Para **compilar** a hierarquia completa de módulos Verilog, digite:
+1. Abra o terminal do ModelSim com o diretório atual na **raiz do repositório**.
+2. Compile todos os módulos:
    ```tcl
    do scripts/compile_project.do
    ```
-4. Para **iniciar a simulação** (que injetará o frame na arquitetura e revelará os scores numéricos no console), digite:
+3. Execute a simulação:
    ```tcl
    do scripts/run_project.do
    ```
 
+O testbench `tb_fpga_top` simulará:
+- Reset do sistema.
+- Envio serial de 1024 bytes via protocolo UART (baud acelerado para simulação).
+- Inferência completa pelo pipeline CNN.
+- Exibição no console: transições da FSM, scores das 7 classes e resultado final (class_id, unknown).
+
+## Como Sintetizar e Programar o FPGA
+
+1. Abra o **Quartus Prime** e carregue `quartus_cnn/cnn_inference.qpf`.
+2. Compile: **Processing → Start Compilation** (ou `Ctrl+L`).
+3. Programe a FPGA via JTAG: **Tools → Programmer** → selecione `output_files/cnn_inference.sof` → **Start**.
+4. Pressione **KEY[0]** para realizar o reset.
+
+## Como Enviar Imagem para a FPGA
+
+Pré-requisitos: Python 3, pacotes `opencv-python`, `pyserial`, `numpy`.
+
+```bash
+# Instalar dependências
+pip install opencv-python pyserial numpy
+
+# Enviar arquivo hexadecimal de teste
+python3 scripts/send_image_32x32.py --file inputs/teste2.txt --hex --port /dev/ttyUSB0
+
+# Enviar uma fotografia (com detecção de rosto automática)
+python3 scripts/send_image_32x32.py --file foto.jpg --port /dev/ttyUSB0 --preview
+
+# Capturar da webcam e enviar
+python3 scripts/send_image_32x32.py --port /dev/ttyUSB0 --preview
+
+# Testar sem a placa (modo simulação)
+python3 scripts/send_image_32x32.py --mock --file inputs/teste2.txt --hex
+```
+
+## Leitura do Resultado nos LEDs
+
+| LED | Significado |
+|-----|-------------|
+| `LEDG[2:0]` | Classe predita em binário (0–6 = membros, 7 = desconhecido) |
+| `LEDG[6]` | Aceso = inferência concluída |
+| `LEDG[7]` | Aceso = score abaixo do limiar (desconhecido) |
+| `LEDG[5:3]` | Não utilizados (apagados) |
+
+Os LEDs permanecem acesos com o último resultado até que um novo reset (`KEY[0]`) ou uma nova imagem seja enviada.
+
 ## Documentação Estendida
 
-Para uma compreensão detalhada acerca do percurso exato dos barramentos numéricos, diagramação da FSM principal de controle e do comportamento de cada módulo individual, verifique a documentação aprofundada incluída na raiz do repositório:
+Para compreensão detalhada de cada módulo, do formato de ponto fixo (Q1.7, Q2.14, Q3.21), do fluxo de dados completo e dos procedimentos de integração futura:
 
-**[Consulte o arquivo pipeline.txt](explicacoes/pipeline.txt)**
-
-A documentação aborda em linguagem minuciosa o comportamento do pipeline implementado, a adequação exigida do formato Q1.7 e Q2.14, bem como as restrições projetadas visando o futuro acoplamento de SRAM externa paralela para controle de Vídeo VGA e barramentos receptores UART.
+* **[Pipeline e Arquitetura](explicacoes/pipeline.txt)** — Descrição exaustiva de todos os módulos, barramentos e formatos numéricos.
+* **[Máquinas de Estados (FSMs)](explicacoes/FSM.md)** — Diagramas Mermaid e explicação ciclo-a-ciclo da FSM de inferência e da lógica de captura dos LEDs.

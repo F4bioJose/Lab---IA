@@ -1,4 +1,4 @@
-# Rodando o topo integrado
-vsim work.tb_cnn_top
+# Rodando o testbench do wrapper FPGA (inferência via UART)
+vsim work.tb_fpga_top
 run -all
 quit -sim

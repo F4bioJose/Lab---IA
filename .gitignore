@@ -1,0 +1,26 @@
+# Imagens
+*.jpg
+*.jpeg
+*.png
+*.bmp
+
+# Arquivos gerados pelo Quartus (Mantenha apenas os .qpf, .qsf e .sdc no Git)
+quartus_cnn/output_files/
+quartus_cnn/db/
+quartus_cnn/incremental_db/
+quartus_cnn/*.rpt
+quartus_cnn/*.smsg
+quartus_cnn/*.summary
+quartus_cnn/*.done
+quartus_cnn/*.pin
+quartus_cnn/*.jdi
+quartus_cnn/*.qws
+
+# Arquivos gerados pelo ModelSim / Simulador
+*.wlf
+transcript
+work/
+
+# Python
+__pycache__/
+*.pyc
