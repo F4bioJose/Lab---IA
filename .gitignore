@@ -1,8 +1,12 @@
-# Imagens
+# Imagens e vídeos
 *.jpg
 *.jpeg
 *.png
 *.bmp
+*.mp4
+*.avi
+*.mpv
+*.zip
 
 # Arquivos gerados pelo Quartus (Mantenha apenas os .qpf, .qsf e .sdc no Git)
 quartus_cnn/output_files/

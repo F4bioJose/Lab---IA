@@ -1,141 +1,180 @@
-# Tiny-CNN FPGA: Fechadura Biométrica Inteligente
+# Tiny-CNN FPGA — Fechadura Biométrica Inteligente
 
-Implementação em hardware de uma Rede Neural Convolucional (CNN) na FPGA DE2-115 (Cyclone IV EP4CE115F29C7) para classificação biométrica facial. O sistema recebe uma imagem 32×32 em escala de cinza via comunicação serial UART, executa a inferência completa em pipeline de hardware dedicado e exibe o resultado da classificação nos LEDs verdes da placa.
+Implementação em hardware de uma Rede Neural Convolucional (CNN) sintetizada na FPGA **DE2-115 (Cyclone IV EP4CE115F29C7)** para classificação biométrica facial em tempo real. O sistema recebe qualquer imagem via UART, executa a inferência completa em pipeline de hardware dedicado e exibe o resultado nos LEDs verdes da placa.
 
-## Status Atual
+---
 
-* **Pipeline Funcional em Hardware:** O fluxo completo de inferência está implementado e sintetizável — desde a recepção serial da imagem até a decisão final exibida nos LEDs.
-* **Pesos Sintéticos:** O arquivo de pesos (`weights_all.mif`) carrega dados gerados sinteticamente para validação estrutural. Para classificação real, deve ser substituído por pesos exportados do modelo TensorFlow/Keras treinado no notebook `pipeline_fechadura.ipynb`.
-* **Imagem de Teste:** O arquivo `inputs/teste2.txt` contém uma imagem hexadecimal para testes. Imagens reais podem ser enviadas via o script Python incluído.
-
-## Arquitetura do Sistema
+## Visão Geral
 
 ```
-PC (send_image_32x32.py)
-  │  1024 bytes via RS-232 (115200 baud)
-  ▼
-UART_RXD ──► uart_rx ──► Framebuffer 32×32
-                              │
-                    FSM auto-start (1024 bytes recebidos)
-                              │
-                              ▼
-                    Line Buffer ──► Conv 3×3 (4 filtros, ReLU)
-                                          │
-                                    Max Pooling 2×2
-                                          │
-                                      Flatten (900)
-                                          │
-                                   Dense 900×7 (7 classes)
-                                          │
-                                  Argmax + Threshold (0.7)
-                                          │
-                                  class_id ──► LEDG[2:0]
-                                  unknown  ──► LEDG[7]
-                                  done     ──► LEDG[6]
+PC (Python)  ──[UART 115200]──►  FPGA DE2-115
+                                      │
+                               uart_rx  →  Framebuffer 32×32
+                                               │ (auto-start ao receber 1024 bytes)
+                                      Line Buffer  →  Convolução 3×3 (4 filtros, ReLU)
+                                                              │
+                                                      Max Pooling 2×2
+                                                              │
+                                                         Flatten (900)
+                                                              │
+                                                    Dense 900×18 (18 classes)
+                                                              │
+                                               Argmax + Threshold 95%
+                                                              │
+                                          class_id[4:0] → LEDG[4:0]
+                                          unknown       → LEDG[7]
+                                          done          → LEDG[6]
 ```
 
-## Estrutura de Diretórios
+**Capacidade:** 18 classes de usuários + rejeição automática por limiar de confiança (95%).
+
+---
+
+## Estrutura do Repositório
 
 ```
 Lab---IA/
-├── modulos_verilog/           # Módulos Verilog do pipeline CNN
-│   ├── fpga_top_de2115.v      # Wrapper top-level para síntese na DE2-115
-│   ├── cnn_top.v              # Orquestrador do pipeline (FSM + instâncias)
-│   ├── uart_rx.v              # Receptor serial UART (115200 baud)
-│   ├── framebuffer_32x32.v    # Buffer de imagem 32×32 (RAM dual-port)
-│   ├── line_buffer_32x32.v    # Buffer de linhas para janelas 3×3
-│   ├── convolucao_mac.v       # Convolução 3×3 (4 filtros + ReLU)
-│   ├── max_pooling_design.v   # Max Pooling 2×2 com FIFO
-│   ├── flatten.v              # Serialização de mapas 2D → vetor 1D
-│   ├── dense_900x7.v          # Camada densa (900 entradas × 7 classes)
-│   ├── argmax_threshold_7.v   # Decisão: argmax + limiar de confiança
-│   ├── weights_shared_rom.v   # ROM de pesos (6347 parâmetros Q1.7)
-│   ├── weights_all.mif        # Arquivo de inicialização dos pesos
-│   └── tb_fpga_top.v          # Testbench (simula envio UART completo)
+├── modulos_verilog/              # Módulos Verilog do pipeline CNN
+│   ├── fpga_top_de2115.v         # Top-level sintetizável (DE2-115)
+│   ├── cnn_top.v                 # Orquestrador FSM + instâncias
+│   ├── uart_rx.v                 # Receptor serial UART
+│   ├── framebuffer_32x32.v       # Buffer de imagem 32×32
+│   ├── line_buffer_32x32.v       # Janelas 3×3 por linha buffer
+│   ├── convolucao_mac.v          # Convolução 3×3 (4 filtros + ReLU)
+│   ├── max_pooling_design.v      # Max Pooling 2×2
+│   ├── flatten.v                 # Serialização 2D → 1D (900 elementos)
+│   ├── dense_900x18.v            # Camada densa (900 × 18 classes)
+│   ├── argmax_threshold_18.v     # Decisão: argmax + threshold 95%
+│   ├── weights_shared_rom.v      # ROM de pesos (arquivo único .hex)
+│   ├── weights_all.mif           # Pesos pré-treinados (fonte)
+│   ├── weights_all.hex           # Pesos convertidos (gerado pelo compile.do)
+│   └── tb_cnn_layer_capture.v    # Testbench: captura saída por camada
 │
-├── quartus_cnn/               # Projeto Quartus Prime para síntese
-│   ├── cnn_inference.qpf      # Arquivo de projeto
-│   ├── cnn_inference.qsf      # Pin assignments e configurações
-│   └── cnn_inference.sdc      # Timing constraints (50 MHz)
+├── quartus_cnn/                  # Projeto Quartus Prime
+│   ├── cnn_inference.qpf         # Arquivo de projeto
+│   ├── cnn_inference.qsf         # Pin assignments e configurações
+│   └── cnn_inference.sdc         # Timing constraints (50 MHz)
 │
-├── scripts/                   # Scripts de automação
-│   ├── compile_project.do     # Compilação ModelSim (todos os módulos)
-│   ├── run_project.do         # Execução do testbench no ModelSim
-│   └── send_image_32x32.py    # Envio de imagem via UART (Python)
+├── scripts/                      # Automação
+│   ├── compile_project.do        # Compilação Questa (converte .mif + vlog)
+│   ├── run_project.do            # Simulação com imagem configurável
+│   ├── extract_sw_activations.py # Extração SW de ativações por camada
+│   ├── compare_sw_hw.py          # Comparação gráfica SW vs. HW
+│   └── send_image_32x32.py       # Envio de imagem para a FPGA via UART
 │
-├── inputs/                    # Imagens de teste
-│   └── teste2.txt             # Imagem 32×32 em formato hexadecimal
+├── inputs/                       # Imagens de teste
+│   └── teste2.txt                # Imagem 32×32 em hexadecimal (1024 bytes)
 │
-├── explicacoes/               # Documentação técnica detalhada
-│   ├── pipeline.txt           # Descrição completa do pipeline e módulos
-│   └── FSM.md                 # Diagramas e explicação das FSMs
+├── explicacoes/                  # Documentação técnica
+│   ├── pipeline.md               # Arquitetura completa e fluxo de dados
+│   └── FSM.md                    # Máquinas de estado (diagramas + ciclos)
 │
-├── pipeline_fechadura.ipynb   # Notebook de treino do modelo (TensorFlow/Keras)
-└── README.md                  # Este arquivo
+├── notebooks_rede/               # Treinamento do modelo
+│   └── pipeline_fechadura.ipynb  # Notebook Keras (treino + exportação .h5)
+│
+├── imagens/                      # Dataset de rostos por usuário
+├── haarcascade_frontalface_default.xml
+├── tiny_cnn_final.h5             # Modelo treinado atual (7 classes — legado)
+└── README.md
 ```
 
-## Como Simular (ModelSim)
+---
 
-Pré-requisito: ModelSim instalado e imagem de teste em `inputs/teste2.txt`.
+## Fluxo de Trabalho
 
-1. Abra o terminal do ModelSim com o diretório atual na **raiz do repositório**.
-2. Compile todos os módulos:
-   ```tcl
-   do scripts/compile_project.do
-   ```
-3. Execute a simulação:
-   ```tcl
-   do scripts/run_project.do
-   ```
-
-O testbench `tb_fpga_top` simulará:
-- Reset do sistema.
-- Envio serial de 1024 bytes via protocolo UART (baud acelerado para simulação).
-- Inferência completa pelo pipeline CNN.
-- Exibição no console: transições da FSM, scores das 7 classes e resultado final (class_id, unknown).
-
-## Como Sintetizar e Programar o FPGA
-
-1. Abra o **Quartus Prime** e carregue `quartus_cnn/cnn_inference.qpf`.
-2. Compile: **Processing → Start Compilation** (ou `Ctrl+L`).
-3. Programe a FPGA via JTAG: **Tools → Programmer** → selecione `output_files/cnn_inference.sof` → **Start**.
-4. Pressione **KEY[0]** para realizar o reset.
-
-## Como Enviar Imagem para a FPGA
-
-Pré-requisitos: Python 3, pacotes `opencv-python`, `pyserial`, `numpy`.
+### 1 · Quando chegar um novo modelo treinado
 
 ```bash
-# Instalar dependências
-pip install opencv-python pyserial numpy
-
-# Enviar arquivo hexadecimal de teste
-python3 scripts/send_image_32x32.py --file inputs/teste2.txt --hex --port /dev/ttyUSB0
-
-# Enviar uma fotografia (com detecção de rosto automática)
-python3 scripts/send_image_32x32.py --file foto.jpg --port /dev/ttyUSB0 --preview
-
-# Capturar da webcam e enviar
-python3 scripts/send_image_32x32.py --port /dev/ttyUSB0 --preview
-
-# Testar sem a placa (modo simulação)
-python3 scripts/send_image_32x32.py --mock --file inputs/teste2.txt --hex
+# Substitua weights_all.mif pelo novo arquivo fornecido
+# A conversão para .hex ocorre automaticamente na compilação
 ```
 
-## Leitura do Resultado nos LEDs
+### 2 · Simulação (Questa FSE)
 
-| LED | Significado |
-|-----|-------------|
-| `LEDG[2:0]` | Classe predita em binário (0–6 = membros, 7 = desconhecido) |
-| `LEDG[6]` | Aceso = inferência concluída |
-| `LEDG[7]` | Aceso = score abaixo do limiar (desconhecido) |
-| `LEDG[5:3]` | Não utilizados (apagados) |
+Abra o Questa/ModelSim **com o terminal na raiz do repositório**.
 
-Os LEDs permanecem acesos com o último resultado até que um novo reset (`KEY[0]`) ou uma nova imagem seja enviada.
+```tcl
+# Passo único: converte .mif → .hex + compila todos os módulos
+do scripts/compile_project.do
 
-## Documentação Estendida
+# Simula com a imagem padrão (inputs/teste2.txt)
+do scripts/run_project.do
 
-Para compreensão detalhada de cada módulo, do formato de ponto fixo (Q1.7, Q2.14, Q3.21), do fluxo de dados completo e dos procedimentos de integração futura:
+# Simula com outra imagem
+do scripts/run_project.do inputs/frame0.txt
 
-* **[Pipeline e Arquitetura](explicacoes/pipeline.txt)** — Descrição exaustiva de todos os módulos, barramentos e formatos numéricos.
-* **[Máquinas de Estados (FSMs)](explicacoes/FSM.md)** — Diagramas Mermaid e explicação ciclo-a-ciclo da FSM de inferência e da lógica de captura dos LEDs.
+# Simula e salva saídas em pasta específica
+do scripts/run_project.do inputs/frame0.txt comparacao/hw/frame0/
+```
+
+**Saídas geradas** em `comparacao/hw/` (ou na pasta especificada):
+
+| Arquivo | Conteúdo |
+|---|---|
+| `conv_out.txt` | Ativações conv pós-ReLU: `f0 f1 f2 f3` por linha (Q2.14) |
+| `pool_out.txt` | Saídas do Max Pooling serializadas (Q2.14) |
+| `flat_out.txt` | Vetor Flatten de 900 elementos (Q2.14) |
+| `dense_out.txt` | 18 scores finais em uma linha (Q2.14) |
+
+### 3 · Comparação SW vs. HW
+
+```bash
+# Extrai ativações do modelo Keras para qualquer imagem
+python scripts/extract_sw_activations.py \
+    --model tiny_cnn_final.h5 \
+    --image inputs/aprovado.jpg \
+    --outdir comparacao/sw/
+
+# Gera gráficos de comparação (histogramas, scatter, barplot, heatmap)
+python scripts/compare_sw_hw.py \
+    --sw-dir comparacao/sw/ \
+    --hw-dir comparacao/hw/
+```
+
+### 4 · Enviar imagem para a FPGA
+
+```bash
+# Imagem .jpg com detecção de rosto automática
+python scripts/send_image_32x32.py --file inputs/aprovado.jpg --port /dev/ttyUSB0
+
+# Arquivo hexadecimal de teste
+python scripts/send_image_32x32.py --file inputs/teste2.txt --hex --port /dev/ttyUSB0
+
+# Webcam (captura ao vivo)
+python scripts/send_image_32x32.py --port /dev/ttyUSB0 --preview
+```
+
+### 5 · Síntese e programação
+
+1. Abra o Quartus Prime: **File → Open Project → `quartus_cnn/cnn_inference.qpf`**
+2. Compile: **Processing → Start Compilation** (`Ctrl+L`)
+3. Programe via JTAG: **Tools → Programmer → `output_files/cnn_inference.sof` → Start**
+4. Pressione **KEY[0]** para reset
+
+---
+
+## LEDs da DE2-115
+
+| LED | Sinal | Significado |
+|-----|-------|-------------|
+| `LEDG[4:0]` | `class_id` | Classe predita em binário (0–17 = membro; 18 = negado) |
+| `LEDG[5]` | `debug_frame_nonzero` | Frame recebido com pixels não-nulos |
+| `LEDG[6]` | `done` | Aceso = inferência concluída |
+| `LEDG[7]` | `unknown` | Aceso = score abaixo do limiar de 95% |
+
+Os LEDs mantêm o último resultado até reset (**KEY[0]**) ou nova inferência.
+
+---
+
+## Dependências Python
+
+```bash
+pip install tensorflow opencv-python numpy matplotlib scipy pyserial
+```
+
+---
+
+## Documentação Técnica
+
+- **[Arquitetura e Pipeline](explicacoes/pipeline.md)** — Fluxo de dados completo, detalhamento de cada módulo, formatos numéricos (Q1.7 / Q2.14 / Q3.21)
+- **[Máquinas de Estado](explicacoes/FSM.md)** — FSM de inferência e lógica de captura dos LEDs, diagramas Mermaid

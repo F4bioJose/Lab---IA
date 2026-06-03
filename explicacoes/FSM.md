@@ -1,9 +1,11 @@
-# Máquinas de Estados Finitas (FSMs) — Projeto Tiny-CNN FPGA
+# Máquinas de Estados Finitas (FSMs) — Tiny-CNN FPGA (18 Classes)
 
 Este documento detalha o funcionamento das duas Máquinas de Estados Finitas que governam o fluxo de inferência da arquitetura Tiny-CNN implementada na FPGA DE2-115. O sistema é composto por dois módulos hierárquicos, cada qual com sua própria lógica de controle:
 
 1. **FSM de Inferência** — residente no módulo `cnn_top.v`, orquestra o pipeline computacional da rede neural.
 2. **Lógica de Captura e Exibição** — residente no módulo `fpga_top_de2115.v`, gerencia a interface física com os periféricos da placa (LEDs, botões).
+
+> Para a descrição detalhada de cada módulo e do fluxo de dados, ver [`pipeline.md`](pipeline.md).
 
 ---
 
@@ -75,11 +77,11 @@ Portanto, a inferência é disparada automaticamente assim que os 1024 bytes da 
 
 **Ações do Estado:**
 - Mantém o barramento de leitura desabilitado (`fb_rd_en = 0`).
-- Monitora passivamente o sinal `dense_done`, que será emitido pela camada densa quando o último dos 900 elementos achatados for processado e os 7 scores de classe estiverem calculados.
+- Monitora passivamente o sinal `dense_done`, que será emitido pela camada densa quando o último dos 900 elementos achatados for processado e os **18 scores de classe** estiverem calculados.
 - Durante este período, o endereço `dense_addr` é incrementado automaticamente a cada pulso de `flat_valid` (controlado fora da FSM, na lógica combinacional do `cnn_top`), percorrendo os 900 endereços da ROM de pesos densos.
 
 **Condição de Transição (`ST_WAIT` ➔ `ST_DONE`):**
-- Ocorre quando `dense_done == 1`. Neste instante, os 7 scores brutos (logits) estão estáveis nas saídas da camada densa, e o módulo Argmax/Threshold já computou `class_id`, `unknown` e `max_score`.
+- Ocorre quando `dense_done == 1`. Neste instante, os 18 scores brutos (logits) estão estáveis nas saídas da camada densa, e o módulo Argmax/Threshold já computou `class_id`, `unknown` e `max_score`.
 
 ---
 
@@ -89,8 +91,8 @@ Portanto, a inferência é disparada automaticamente assim que os 1024 bytes da 
 **Ações do Estado:**
 - Ativa o sinal `access_done = 1` por um único ciclo.
 - Neste exato ciclo, as seguintes portas de saída do `cnn_top` contêm valores válidos e podem ser capturados:
-  - `class_id[2:0]`: índice da classe predita (0 a 6 para membros da equipe, 7 para desconhecido).
-  - `unknown`: flag booleano indicando se o score máximo ficou abaixo do limiar de confiança.
+  - `class_id[4:0]`: índice da classe predita (0–17 para membros, **18** para negado/desconhecido).
+  - `unknown`: flag booleano indicando se o score máximo ficou abaixo do limiar de confiança (95%).
   - `final_result[15:0]`: valor numérico do maior score em formato Q2.14.
 
 **Condição de Transição (`ST_DONE` ➔ `ST_IDLE`):**
@@ -120,19 +122,15 @@ stateDiagram-v2
 
 | LED | Sinal Latched | Significado |
 |-----|---------------|-------------|
-| `LEDG[0]` | `class_id[0]` | Bit 0 do identificador da classe |
-| `LEDG[1]` | `class_id[1]` | Bit 1 do identificador da classe |
-| `LEDG[2]` | `class_id[2]` | Bit 2 do identificador da classe |
-| `LEDG[3]` | `0` | Reservado (apagado) |
-| `LEDG[4]` | `0` | Reservado (apagado) |
-| `LEDG[5]` | `0` | Reservado (apagado) |
+| `LEDG[4:0]` | `class_id[4:0]` | Classe predita em binário (0–17 = membro; 18 = negado) |
+| `LEDG[5]` | `debug_frame_nonzero` | Frame recebido com pixels não-nulos |
 | `LEDG[6]` | `1` quando concluído | Inferência concluída com sucesso |
-| `LEDG[7]` | `unknown` | Score máximo ficou abaixo do limiar de confiança |
+| `LEDG[7]` | `unknown` | Score máximo abaixo do limiar de 95% |
 
 **Comportamento detalhado:**
 - **Ao reset (`KEY[0]` pressionado):** Todos os LEDs são apagados (`LEDG = 8'b00000000`).
-- **Ao receber `access_done == 1`:** O registrador captura instantaneamente os valores de `class_id[2:0]` e `unknown`, acende `LEDG[6]` para confirmar a conclusão, e mantém estes valores indefinidamente.
-- **Ao receber `frame_ready == 1` (nova imagem chegou):** O `LEDG[6]` é apagado, sinalizando visualmente que uma nova inferência está em andamento. Os LEDs `LEDG[2:0]` e `LEDG[7]` mantêm temporariamente os valores da inferência anterior.
+- **Ao receber `access_done == 1`:** O registrador captura instantaneamente `class_id[4:0]`, `debug_frame_nonzero` e `unknown`, acende `LEDG[6]` para confirmar a conclusão, e mantém estes valores indefinidamente.
+- **Ao receber `frame_ready == 1` (nova imagem chegou):** O `LEDG[6]` é apagado, sinalizando visualmente que uma nova inferência está em andamento. Os demais LEDs mantêm temporariamente os valores da inferência anterior.
 - **Quando a nova inferência conclui:** Os LEDs são atualizados com os novos valores.
 
 ### 2.3 Sincronização do Botão KEY[1]

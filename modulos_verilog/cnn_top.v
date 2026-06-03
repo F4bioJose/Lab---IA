@@ -1,8 +1,9 @@
 // ==============================================================================
 // Módulo: cnn_top
-// Descrição: Top-level da arquitetura Tiny-CNN. Instancia, conecta e orquestra 
-//            todos os submódulos da rede: Framebuffer, Line Buffer, Convolução, 
-//            Max Pooling, Flatten, Camada Densa e Decisão (Argmax/Threshold).
+// Descrição: Top-level da arquitetura Tiny-CNN. Instancia, conecta e orquestra
+//            todos os submódulos da rede: Framebuffer, Line Buffer, Convolução,
+//            Max Pooling, Flatten, Camada Densa (18 classes) e Decisão
+//            (Argmax/Threshold com limiar de 95% configurável).
 // ==============================================================================
 module cnn_top (
     input wire clk,
@@ -17,28 +18,25 @@ module cnn_top (
     // [PONTO DE INTEGRAÇÃO - UART]
     // O módulo Controlador UART deverá ser conectado nessas três portas abaixo.
     // O script em Python enviará os bytes da imagem serialmente, a FSM da UART
-    // agrupará em 8 bits e ativará o `fb_wr_en`, incrementando o `fb_wr_addr` 
+    // agrupará em 8 bits e ativará o `fb_wr_en`, incrementando o `fb_wr_addr`
     // a cada ciclo de escrita válido. Atingindo o limite, a inferência dispara.
     input wire fb_wr_en,
     input wire [9:0] fb_wr_addr,
     input wire [7:0] fb_wr_data,
 
     // [PONTO DE INTEGRAÇÃO - VGA E SRAM EXTERNA]
-    // A varredura de exibição de vídeo se conectará aqui. O Controlador VGA
-    // ativará o `vga_rd_en` e fará o mapeamento de pixels X,Y em `vga_rd_addr`.
-    // NOTA PARA ARTEFATO 3: Na versão final, estas portas e o módulo Framebuffer 
-    // interno devem ser substituídos pelo Controlador da SRAM externa de 512 KB da DE2-115.
+    // A varredura de exibição de vídeo se conectará aqui.
     input wire vga_rd_en,
     input wire [9:0] vga_rd_addr,
     output wire [7:0] vga_rd_data,
 
     output wire [15:0] final_result,
-    output wire [2:0] class_id,
-    output wire unknown,
-    output reg access_done,
-    output wire frame_ready,
-    output wire debug_weights_nonzero,
-    output wire debug_frame_nonzero
+    output wire [4:0]  class_id,       // 0-17 = classe; 18 = negado
+    output wire        unknown,
+    output reg         access_done,
+    output wire        frame_ready,
+    output wire        debug_weights_nonzero,
+    output wire        debug_frame_nonzero
 );
 
     // UART RX sincronizado para o clock interno
@@ -80,11 +78,13 @@ module cnn_top (
     wire flat_valid;
     wire signed [15:0] flat_data;
 
-    wire signed [7:0] dense_w [0:6];
-    wire signed [7:0] dense_b [0:6];
-    localparam integer DENSE_ADDR_WIDTH = 13;
+    // Pesos e biases — 18 classes
+    wire signed [7:0] dense_w [0:17];
+    wire signed [7:0] dense_b [0:17];
+    localparam integer DENSE_ADDR_WIDTH = 14;
     reg [DENSE_ADDR_WIDTH-1:0] dense_addr;
 
+    // Pesos convolucionais
     wire signed [7:0] conv_w0 [0:8];
     wire signed [7:0] conv_w1 [0:8];
     wire signed [7:0] conv_w2 [0:8];
@@ -93,9 +93,10 @@ module cnn_top (
     wire signed [7:0] conv_b1;
     wire signed [7:0] conv_b2;
     wire signed [7:0] conv_b3;
+
     wire dense_done;
     wire dense_valid;
-    wire signed [15:0] dense_scores [0:6];
+    wire signed [15:0] dense_scores [0:17];
     wire argmax_valid;
 
     reg [10:0] rd_req_count;
@@ -103,10 +104,10 @@ module cnn_top (
     reg [7:0] debug_or_acc;
 
     // Maquina de estados (FSM) principal para controle do pipeline
-    localparam ST_IDLE  = 2'd0; // Estado inativo aguardando frame_ready
-    localparam ST_READ  = 2'd1; // Varredura de memória para alimentação da rede
-    localparam ST_WAIT  = 2'd2; // Aguardando as últimas camadas concluírem (densa)
-    localparam ST_DONE  = 2'd3; // Sinaliza fim da inferência e resultado válido
+    localparam ST_IDLE  = 2'd0;
+    localparam ST_READ  = 2'd1;
+    localparam ST_WAIT  = 2'd2;
+    localparam ST_DONE  = 2'd3;
 
     reg [1:0] state;
 
@@ -114,8 +115,11 @@ module cnn_top (
     assign uart_wr_en_comb = uart_valid && (state == ST_IDLE) && !frame_ready && !uart_frame_pending;
 
     assign debug_weights_nonzero = |{conv_b0, conv_b1, conv_b2, conv_b3,
-                                    dense_b[0], dense_b[1], dense_b[2], dense_b[3],
-                                    dense_b[4], dense_b[5], dense_b[6]};
+                                    dense_b[ 0], dense_b[ 1], dense_b[ 2], dense_b[ 3],
+                                    dense_b[ 4], dense_b[ 5], dense_b[ 6], dense_b[ 7],
+                                    dense_b[ 8], dense_b[ 9], dense_b[10], dense_b[11],
+                                    dense_b[12], dense_b[13], dense_b[14], dense_b[15],
+                                    dense_b[16], dense_b[17]};
     assign debug_frame_nonzero = |debug_or_acc;
 
     // UART RX: converte serial em byte + pulso de dado valido
@@ -127,19 +131,14 @@ module cnn_top (
         .data_valid(uart_valid)
     );
 
-    assign fb_wr_en_int = uart_wr_en_comb | fb_wr_en;
-    assign fb_wr_addr_int = uart_wr_en_comb ? uart_wr_addr : fb_wr_addr;
-    assign fb_wr_data_int = uart_wr_en_comb ? uart_data : fb_wr_data;
+    assign fb_wr_en_int    = uart_wr_en_comb | fb_wr_en;
+    assign fb_wr_addr_int  = uart_wr_en_comb ? uart_wr_addr : fb_wr_addr;
+    assign fb_wr_data_int  = uart_wr_en_comb ? uart_data    : fb_wr_data;
     assign start_system_int = start_system | uart_start_pulse;
 
-    // [MAPEAMENTO DE MEMÓRIA FUTURO (SRAM)]
-    // NOTA PARA ARTEFATO 3: O Framebuffer deve ser substituído pela interface da SRAM.
-    // Mapeamento sugerido para a SRAM de 512KB:
-    // - Banco A: 640x480 (Escala de cinza) reservado para a saída VGA.
-    // - Banco B: 32x32 (Escala de cinza) reservado para a entrada da CNN.
-    // =====================================================================
+    // =========================================================================
     // Instanciação e Interconexão dos Componentes do Hardware CNN
-    // =====================================================================
+    // =========================================================================
 
     // 1. Framebuffer: Armazena a imagem a ser processada
     framebuffer_32x32 framebuffer_inst (
@@ -213,7 +212,7 @@ module cnn_top (
         .done()
     );
 
-    // 6. Memória ROM Compartilhada: Pesos pré-treinados
+    // 6. Memória ROM Compartilhada: Pesos pré-treinados (18 classes)
     weights_shared_rom weights_inst (
         .dense_addr(dense_addr),
         .conv_w0(conv_w0),
@@ -228,8 +227,8 @@ module cnn_top (
         .dense_b(dense_b)
     );
 
-    // 7. Camada Densa: Calcula os logits (scores brutos) para as 7 classes
-    dense_900x7_scores dense_inst (
+    // 7. Camada Densa: Calcula os logits (scores brutos) para as 18 classes
+    dense_900x18_scores dense_inst (
         .clk(clk),
         .rst(rst),
         .x_in(flat_data),
@@ -241,9 +240,11 @@ module cnn_top (
         .done(dense_done)
     );
 
-    // 8. Argmax + Threshold: Identifica a predição dominante com limiar de confiança
-    argmax_threshold_7 #(
-        .BYPASS_THRESHOLD(1'b1)
+    // 8. Argmax + Threshold: Identifica a predição dominante com limiar de 95%
+    //    Para alterar o threshold, modifique o parâmetro THRESH_Q2_14:
+    //      95% → 15564 | 90% → 14746 | 80% → 13107 | 70% → 11469
+    argmax_threshold_18 #(
+        .THRESH_Q2_14(16'sd15564)
     ) argmax_inst (
         .clk(clk),
         .rst(rst),
@@ -257,34 +258,34 @@ module cnn_top (
 
     always @(posedge clk or posedge rst) begin
         if (rst) begin
-            rx_sync_1 <= 1'b1;
-            rx_sync_2 <= 1'b1;
-            uart_wr_addr <= 10'd0;
+            rx_sync_1       <= 1'b1;
+            rx_sync_2       <= 1'b1;
+            uart_wr_addr    <= 10'd0;
             uart_start_pulse <= 1'b0;
             uart_frame_pending <= 1'b0;
-            state <= ST_IDLE;
-            fb_rd_en <= 1'b0;
-            fb_rd_en_d <= 1'b0;
-            fb_rd_addr <= 10'd0;
-            rd_req_count <= 11'd0;
-            rd_val_count <= 11'd0;
-            dense_addr <= 13'd0;
-            debug_or_acc <= 8'd0;
-            access_done <= 1'b0;
-            frame_clear <= 1'b0;
+            state           <= ST_IDLE;
+            fb_rd_en        <= 1'b0;
+            fb_rd_en_d      <= 1'b0;
+            fb_rd_addr      <= 10'd0;
+            rd_req_count    <= 11'd0;
+            rd_val_count    <= 11'd0;
+            dense_addr      <= 14'd0;
+            debug_or_acc    <= 8'd0;
+            access_done     <= 1'b0;
+            frame_clear     <= 1'b0;
         end else begin
             rx_sync_1 <= rx_pin;
             rx_sync_2 <= rx_sync_1;
 
             uart_start_pulse <= 1'b0;
-            access_done <= 1'b0;
-            frame_clear <= 1'b0;
-            fb_rd_en_d <= fb_rd_en;
+            access_done      <= 1'b0;
+            frame_clear      <= 1'b0;
+            fb_rd_en_d       <= fb_rd_en;
 
             // Incremento de endereço UART: avança APÓS a escrita combinacional
             if (uart_wr_en_comb) begin
                 if (uart_wr_addr == 10'd1023) begin
-                    uart_wr_addr <= 10'd0;
+                    uart_wr_addr       <= 10'd0;
                     uart_frame_pending <= 1'b1;
                 end else begin
                     uart_wr_addr <= uart_wr_addr + 10'd1;
@@ -292,7 +293,7 @@ module cnn_top (
             end
 
             if (uart_frame_pending && frame_ready && state == ST_IDLE) begin
-                uart_start_pulse <= 1'b1;
+                uart_start_pulse   <= 1'b1;
                 uart_frame_pending <= 1'b0;
             end
 
@@ -302,10 +303,10 @@ module cnn_top (
             end
 
             if (flat_valid) begin
-                if (dense_addr == 13'd899) begin
-                    dense_addr <= 13'd0;
+                if (dense_addr == 14'd899) begin
+                    dense_addr <= 14'd0;
                 end else begin
-                    dense_addr <= dense_addr + 13'd1;
+                    dense_addr <= dense_addr + 14'd1;
                 end
             end
 
@@ -316,21 +317,20 @@ module cnn_top (
 
             case (state)
                 ST_IDLE: begin
-                    fb_rd_en <= 1'b0;
-                    fb_rd_addr <= 10'd0;
+                    fb_rd_en     <= 1'b0;
+                    fb_rd_addr   <= 10'd0;
                     rd_req_count <= 11'd0;
                     rd_val_count <= 11'd0;
                     if (start_system_int && frame_ready) begin
-                        state <= ST_READ;
+                        state       <= ST_READ;
                         frame_clear <= 1'b1;
-                        dense_addr <= 13'd0;
+                        dense_addr  <= 14'd0;
                     end
                 end
 
                 ST_READ: begin
-                    // Varre sequencialmente todo o buffer de memória da imagem (1024 endereços)
                     if (rd_req_count < 11'd1024) begin
-                        fb_rd_en <= 1'b1;
+                        fb_rd_en   <= 1'b1;
                         fb_rd_addr <= rd_req_count[9:0];
                         rd_req_count <= rd_req_count + 11'd1;
                     end else begin
@@ -339,7 +339,7 @@ module cnn_top (
 
                     if (rd_val_count == 11'd1024) begin
                         fb_rd_en <= 1'b0;
-                        state <= ST_WAIT;
+                        state    <= ST_WAIT;
                     end
                 end
 
@@ -352,7 +352,7 @@ module cnn_top (
 
                 ST_DONE: begin
                     access_done <= 1'b1;
-                    state <= ST_IDLE;
+                    state       <= ST_IDLE;
                 end
 
                 default: begin

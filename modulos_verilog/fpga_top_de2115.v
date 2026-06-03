@@ -1,21 +1,19 @@
 // ==============================================================================
 // Módulo: fpga_top_de2115
 // Descrição: Top-level sintetizável para inferência CNN na DE2-115.
-//            Recebe 1 imagem 32×32 grayscale via UART serial (115200 baud),
-//            executa a inferência completa pelo pipeline cnn_top, e exibe
-//            o resultado da classificação nos LEDs verdes (LEDG).
+//            Recebe 1 imagem 32×32 grayscale via UART serial,
+//            executa a inferência completa pelo pipeline cnn_top (18 classes),
+//            e exibe o resultado da classificação nos LEDs verdes (LEDG).
 //
 // Mapeamento dos LEDs:
-//   LEDG[2:0] = class_id (0..6 = classes, 7 = desconhecido)
-//   LEDG[6]   = access_done (inferência concluída)
-//   LEDG[7]   = unknown (score abaixo do threshold)
-//   LEDG[5:3] = (reservado, apagados)
+//   LEDG[4:0] = class_id (0..17 = classe válida; 18 = negado/unknown)
+//   LEDG[5]   = debug_frame_nonzero (frame recebido com pixels não-nulos)
+//   LEDG[6]   = access_done (inferência concluída — pisca por 1 ciclo, latchado)
+//   LEDG[7]   = unknown (score abaixo do threshold de 95%)
 //
 // Controles:
 //   KEY[0] = Reset global (active-low, com Schmitt trigger na placa)
-//   KEY[1] = Start manual da inferência (active-low) — alternativa ao
-//            auto-start via UART. Pressionar após carregar imagem pelo
-//            testbench ou por escrita direta no framebuffer.
+//   KEY[1] = Start manual da inferência (active-low)
 //
 // Placa: DE2-115 (EP4CE115F29C7, Cyclone IV E)
 // ==============================================================================
@@ -29,7 +27,7 @@ module fpga_top_de2115 (
     // UART (RS-232 RXD via transceiver MAX3232 da DE2-115)
     input  wire        UART_RXD,
 
-    // LEDs Verdes (resultado da classificação)
+    // LEDs Verdes (resultado da classificação — 8 LEDs disponíveis)
     output reg  [7:0]  LEDG
 );
 
@@ -44,7 +42,7 @@ module fpga_top_de2115 (
 
     // Saídas do cnn_top
     wire [15:0] final_result;
-    wire [2:0]  class_id;
+    wire [4:0]  class_id;           // 5 bits: 0-17 válido, 18 = negado
     wire        unknown;
     wire        access_done;
     wire        frame_ready;
@@ -73,9 +71,7 @@ module fpga_top_de2115 (
     assign key1_pressed = key1_prev & ~key1_sync_2;
 
     // =========================================================================
-    // 2. CNN PIPELINE COMPLETO
-    //    O cnn_top já possui UART RX integrado, controle de framebuffer,
-    //    e auto-start quando 1024 bytes são recebidos via UART.
+    // 2. CNN PIPELINE COMPLETO (18 classes)
     // =========================================================================
     cnn_top cnn_inst (
         .clk           (CLOCK_50),
@@ -84,7 +80,7 @@ module fpga_top_de2115 (
         // UART — conectado diretamente ao pino físico
         .rx_pin        (UART_RXD),
 
-        // Start manual via botão KEY[1] (complementar ao auto-start UART)
+        // Start manual via botão KEY[1]
         .start_system  (key1_pressed),
 
         // Portas de escrita direta no framebuffer (não usadas nesta fase)
@@ -118,17 +114,12 @@ module fpga_top_de2115 (
             LEDG <= 8'd0;
         end else begin
             if (access_done) begin
-                // Captura o resultado no instante exato do access_done
-                LEDG[2:0] <= class_id;
-                LEDG[5]   <= debug_weights_nonzero;
-                LEDG[4]   <= debug_frame_nonzero;
-                LEDG[3]   <= 1'b0;
-                LEDG[6]   <= 1'b1;          // Sinaliza inferência concluída
-                LEDG[7]   <= unknown;
+                LEDG[4:0] <= class_id;          // 0-17 = classe; 18 = negado
+                LEDG[5]   <= debug_frame_nonzero;
+                LEDG[6]   <= 1'b1;              // Sinaliza inferência concluída
+                LEDG[7]   <= unknown;            // 1 = abaixo do threshold (negado)
             end
-            // Indicação visual de frame recebido (pisca brevemente)
-            // Quando um novo frame é recebido, apaga LEDG[6] para indicar
-            // que uma nova inferência será realizada
+            // Apaga LEDG[6] quando novo frame começa a ser processado
             if (frame_ready && !access_done) begin
                 LEDG[6] <= 1'b0;
             end

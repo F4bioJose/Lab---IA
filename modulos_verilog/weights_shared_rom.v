@@ -1,100 +1,153 @@
 // ==============================================================================
 // Módulo: weights_shared_rom
 // Descrição: Memória ROM (Read-Only Memory) estática que carrega os pesos
-//            e os vieses treinados do arquivo .mif (Memory Initialization File).
-//            Fornece acesso de leitura para a pipeline da CNN.
+//            e os vieses treinados a partir de um único arquivo .hex.
+//            Fornece acesso de leitura para o pipeline da CNN.
+//
+// *** CONFIGURAÇÃO DE CLASSES ***
+// Altere DENSE_CLASSES conforme o modelo em uso:
+//   DENSE_CLASSES = 7  → weights_all.hex gerado do .mif de 7 classes (atual)
+//   DENSE_CLASSES = 18 → weights_all.hex gerado do .mif de 18 classes (futuro)
+//
+// Estrutura do arquivo de pesos:
+//   [0   .. 35]                         → pesos conv (4 filtros × 9 coefs)
+//   [36  .. 39]                         → biases conv (4)
+//   [40  .. 40 + DENSE_SIZE*N - 1]     → pesos densos (DENSE_SIZE × N classes)
+//   [40 + DENSE_SIZE*N .. +N-1]        → biases densos (N)
 // ==============================================================================
 module weights_shared_rom #(
-    parameter MEM_FILE_MIF = "modulos_verilog/weights_all.mif",
-    parameter integer CONV_FILTERS = 4,
-    parameter integer CONV_KERNEL = 9,
-    parameter integer DENSE_SIZE = 900,
-    parameter integer DENSE_CLASSES = 7,
-    parameter integer TOTAL_WORDS = (CONV_FILTERS * CONV_KERNEL)
-        + CONV_FILTERS
-        + (DENSE_SIZE * DENSE_CLASSES)
-        + DENSE_CLASSES,
-    parameter integer ADDR_WIDTH = (TOTAL_WORDS > 1) ? $clog2(TOTAL_WORDS) : 1
+    parameter MEM_FILE      = "modulos_verilog/weights_all.hex",
+    parameter integer CONV_FILTERS  = 4,
+    parameter integer CONV_KERNEL   = 9,
+    parameter integer DENSE_SIZE    = 900,
+    // *** ALTERE AQUI PARA 7 (validação) OU 18 (produção) ***
+    parameter integer DENSE_CLASSES = 18,
+    parameter integer OFF_CONV_W     = 0,                                 // 0
+    parameter integer OFF_CONV_B     = CONV_FILTERS * CONV_KERNEL,        // 36
+    parameter integer OFF_DENSE_W    = OFF_CONV_B + CONV_FILTERS,         // 40
+    parameter integer OFF_DENSE_B    = OFF_DENSE_W + DENSE_SIZE * DENSE_CLASSES, // 16240
+    parameter integer TOTAL_WORDS    = OFF_DENSE_B + DENSE_CLASSES        // 16258
 )(
-    input wire [ADDR_WIDTH-1:0] dense_addr,
-    output wire signed [7:0] conv_w0 [0:CONV_KERNEL-1],
-    output wire signed [7:0] conv_w1 [0:CONV_KERNEL-1],
-    output wire signed [7:0] conv_w2 [0:CONV_KERNEL-1],
-    output wire signed [7:0] conv_w3 [0:CONV_KERNEL-1],
-    output wire signed [7:0] conv_b0,
-    output wire signed [7:0] conv_b1,
-    output wire signed [7:0] conv_b2,
-    output wire signed [7:0] conv_b3,
-    output wire signed [7:0] dense_w [0:DENSE_CLASSES-1],
-    output wire signed [7:0] dense_b [0:DENSE_CLASSES-1]
+    input  wire [13:0]              dense_addr,     // Endereço de 0 a 899 (entrada do flatten)
+    // Pesos e biases da camada convolucional
+    output wire signed [7:0]        conv_w0 [0:CONV_KERNEL-1],
+    output wire signed [7:0]        conv_w1 [0:CONV_KERNEL-1],
+    output wire signed [7:0]        conv_w2 [0:CONV_KERNEL-1],
+    output wire signed [7:0]        conv_w3 [0:CONV_KERNEL-1],
+    output wire signed [7:0]        conv_b0,
+    output wire signed [7:0]        conv_b1,
+    output wire signed [7:0]        conv_b2,
+    output wire signed [7:0]        conv_b3,
+    // Pesos e biases da camada densa (18 classes)
+    output wire signed [7:0]        dense_w [0:DENSE_CLASSES-1],
+    output wire signed [7:0]        dense_b [0:DENSE_CLASSES-1]
 );
 
-    // Splitted ROM arrays to avoid giant multiplexer synthesis bottlenecks
-    reg signed [7:0] mem_conv [0:39];
-    reg signed [7:0] mem_dense_b [0:6];
-    
-    reg signed [7:0] mem_dense_0 [0:899];
-    reg signed [7:0] mem_dense_1 [0:899];
-    reg signed [7:0] mem_dense_2 [0:899];
-    reg signed [7:0] mem_dense_3 [0:899];
-    reg signed [7:0] mem_dense_4 [0:899];
-    reg signed [7:0] mem_dense_5 [0:899];
-    reg signed [7:0] mem_dense_6 [0:899];
+    // -------------------------------------------------------------------------
+    // Array único de memória — inicializado a partir de um único arquivo .hex
+    // -------------------------------------------------------------------------
+    reg signed [7:0] mem [0:TOTAL_WORDS-1];
 
     initial begin
 `ifdef ALTERA_RESERVED_QIS
-        $readmemh("../modulos_verilog/weights_conv.hex", mem_conv);
-        $readmemh("../modulos_verilog/weights_dense_b.hex", mem_dense_b);
-        $readmemh("../modulos_verilog/weights_dense_0.hex", mem_dense_0);
-        $readmemh("../modulos_verilog/weights_dense_1.hex", mem_dense_1);
-        $readmemh("../modulos_verilog/weights_dense_2.hex", mem_dense_2);
-        $readmemh("../modulos_verilog/weights_dense_3.hex", mem_dense_3);
-        $readmemh("../modulos_verilog/weights_dense_4.hex", mem_dense_4);
-        $readmemh("../modulos_verilog/weights_dense_5.hex", mem_dense_5);
-        $readmemh("../modulos_verilog/weights_dense_6.hex", mem_dense_6);
+        $readmemh({"../", MEM_FILE}, mem);
 `else
-        $readmemh("modulos_verilog/weights_conv.hex", mem_conv);
-        $readmemh("modulos_verilog/weights_dense_b.hex", mem_dense_b);
-        $readmemh("modulos_verilog/weights_dense_0.hex", mem_dense_0);
-        $readmemh("modulos_verilog/weights_dense_1.hex", mem_dense_1);
-        $readmemh("modulos_verilog/weights_dense_2.hex", mem_dense_2);
-        $readmemh("modulos_verilog/weights_dense_3.hex", mem_dense_3);
-        $readmemh("modulos_verilog/weights_dense_4.hex", mem_dense_4);
-        $readmemh("modulos_verilog/weights_dense_5.hex", mem_dense_5);
-        $readmemh("modulos_verilog/weights_dense_6.hex", mem_dense_6);
+        $readmemh(MEM_FILE, mem);
 `endif
     end
 
-    genvar k;
-    generate
-        // Mapeamento Estático Combinacional
-        for (k = 0; k < CONV_KERNEL; k = k + 1) begin : conv_map
-            assign conv_w0[k] = mem_conv[(0 * CONV_KERNEL) + k];
-            assign conv_w1[k] = mem_conv[(1 * CONV_KERNEL) + k];
-            assign conv_w2[k] = mem_conv[(2 * CONV_KERNEL) + k];
-            assign conv_w3[k] = mem_conv[(3 * CONV_KERNEL) + k];
-        end
-    endgenerate
+    // -------------------------------------------------------------------------
+    // Mapeamento estático dos pesos convolucionais (36 pesos + 4 biases)
+    // Filtro k: mem[k*9 .. k*9+8]
+    // -------------------------------------------------------------------------
+    assign conv_w0[0] = mem[OFF_CONV_W +  0];
+    assign conv_w0[1] = mem[OFF_CONV_W +  1];
+    assign conv_w0[2] = mem[OFF_CONV_W +  2];
+    assign conv_w0[3] = mem[OFF_CONV_W +  3];
+    assign conv_w0[4] = mem[OFF_CONV_W +  4];
+    assign conv_w0[5] = mem[OFF_CONV_W +  5];
+    assign conv_w0[6] = mem[OFF_CONV_W +  6];
+    assign conv_w0[7] = mem[OFF_CONV_W +  7];
+    assign conv_w0[8] = mem[OFF_CONV_W +  8];
 
-    assign conv_b0 = mem_conv[36];
-    assign conv_b1 = mem_conv[37];
-    assign conv_b2 = mem_conv[38];
-    assign conv_b3 = mem_conv[39];
+    assign conv_w1[0] = mem[OFF_CONV_W +  9];
+    assign conv_w1[1] = mem[OFF_CONV_W + 10];
+    assign conv_w1[2] = mem[OFF_CONV_W + 11];
+    assign conv_w1[3] = mem[OFF_CONV_W + 12];
+    assign conv_w1[4] = mem[OFF_CONV_W + 13];
+    assign conv_w1[5] = mem[OFF_CONV_W + 14];
+    assign conv_w1[6] = mem[OFF_CONV_W + 15];
+    assign conv_w1[7] = mem[OFF_CONV_W + 16];
+    assign conv_w1[8] = mem[OFF_CONV_W + 17];
 
-    assign dense_w[0] = mem_dense_0[dense_addr];
-    assign dense_w[1] = mem_dense_1[dense_addr];
-    assign dense_w[2] = mem_dense_2[dense_addr];
-    assign dense_w[3] = mem_dense_3[dense_addr];
-    assign dense_w[4] = mem_dense_4[dense_addr];
-    assign dense_w[5] = mem_dense_5[dense_addr];
-    assign dense_w[6] = mem_dense_6[dense_addr];
+    assign conv_w2[0] = mem[OFF_CONV_W + 18];
+    assign conv_w2[1] = mem[OFF_CONV_W + 19];
+    assign conv_w2[2] = mem[OFF_CONV_W + 20];
+    assign conv_w2[3] = mem[OFF_CONV_W + 21];
+    assign conv_w2[4] = mem[OFF_CONV_W + 22];
+    assign conv_w2[5] = mem[OFF_CONV_W + 23];
+    assign conv_w2[6] = mem[OFF_CONV_W + 24];
+    assign conv_w2[7] = mem[OFF_CONV_W + 25];
+    assign conv_w2[8] = mem[OFF_CONV_W + 26];
 
-    assign dense_b[0] = mem_dense_b[0];
-    assign dense_b[1] = mem_dense_b[1];
-    assign dense_b[2] = mem_dense_b[2];
-    assign dense_b[3] = mem_dense_b[3];
-    assign dense_b[4] = mem_dense_b[4];
-    assign dense_b[5] = mem_dense_b[5];
-    assign dense_b[6] = mem_dense_b[6];
+    assign conv_w3[0] = mem[OFF_CONV_W + 27];
+    assign conv_w3[1] = mem[OFF_CONV_W + 28];
+    assign conv_w3[2] = mem[OFF_CONV_W + 29];
+    assign conv_w3[3] = mem[OFF_CONV_W + 30];
+    assign conv_w3[4] = mem[OFF_CONV_W + 31];
+    assign conv_w3[5] = mem[OFF_CONV_W + 32];
+    assign conv_w3[6] = mem[OFF_CONV_W + 33];
+    assign conv_w3[7] = mem[OFF_CONV_W + 34];
+    assign conv_w3[8] = mem[OFF_CONV_W + 35];
+
+    assign conv_b0 = mem[OFF_CONV_B + 0];
+    assign conv_b1 = mem[OFF_CONV_B + 1];
+    assign conv_b2 = mem[OFF_CONV_B + 2];
+    assign conv_b3 = mem[OFF_CONV_B + 3];
+
+    // -------------------------------------------------------------------------
+    // Mapeamento dinâmico dos pesos densos — indexado por dense_addr (0..899)
+    // Cada classe c ocupa mem[OFF_DENSE_W + c*900 .. OFF_DENSE_W + c*900 + 899]
+    // -------------------------------------------------------------------------
+    assign dense_w[ 0] = mem[OFF_DENSE_W +  0 * DENSE_SIZE + dense_addr];
+    assign dense_w[ 1] = mem[OFF_DENSE_W +  1 * DENSE_SIZE + dense_addr];
+    assign dense_w[ 2] = mem[OFF_DENSE_W +  2 * DENSE_SIZE + dense_addr];
+    assign dense_w[ 3] = mem[OFF_DENSE_W +  3 * DENSE_SIZE + dense_addr];
+    assign dense_w[ 4] = mem[OFF_DENSE_W +  4 * DENSE_SIZE + dense_addr];
+    assign dense_w[ 5] = mem[OFF_DENSE_W +  5 * DENSE_SIZE + dense_addr];
+    assign dense_w[ 6] = mem[OFF_DENSE_W +  6 * DENSE_SIZE + dense_addr];
+    assign dense_w[ 7] = mem[OFF_DENSE_W +  7 * DENSE_SIZE + dense_addr];
+    assign dense_w[ 8] = mem[OFF_DENSE_W +  8 * DENSE_SIZE + dense_addr];
+    assign dense_w[ 9] = mem[OFF_DENSE_W +  9 * DENSE_SIZE + dense_addr];
+    assign dense_w[10] = mem[OFF_DENSE_W + 10 * DENSE_SIZE + dense_addr];
+    assign dense_w[11] = mem[OFF_DENSE_W + 11 * DENSE_SIZE + dense_addr];
+    assign dense_w[12] = mem[OFF_DENSE_W + 12 * DENSE_SIZE + dense_addr];
+    assign dense_w[13] = mem[OFF_DENSE_W + 13 * DENSE_SIZE + dense_addr];
+    assign dense_w[14] = mem[OFF_DENSE_W + 14 * DENSE_SIZE + dense_addr];
+    assign dense_w[15] = mem[OFF_DENSE_W + 15 * DENSE_SIZE + dense_addr];
+    assign dense_w[16] = mem[OFF_DENSE_W + 16 * DENSE_SIZE + dense_addr];
+    assign dense_w[17] = mem[OFF_DENSE_W + 17 * DENSE_SIZE + dense_addr];
+
+    // -------------------------------------------------------------------------
+    // Mapeamento estático dos biases densos (18 bytes, endereços fixos)
+    // -------------------------------------------------------------------------
+    assign dense_b[ 0] = mem[OFF_DENSE_B +  0];
+    assign dense_b[ 1] = mem[OFF_DENSE_B +  1];
+    assign dense_b[ 2] = mem[OFF_DENSE_B +  2];
+    assign dense_b[ 3] = mem[OFF_DENSE_B +  3];
+    assign dense_b[ 4] = mem[OFF_DENSE_B +  4];
+    assign dense_b[ 5] = mem[OFF_DENSE_B +  5];
+    assign dense_b[ 6] = mem[OFF_DENSE_B +  6];
+    assign dense_b[ 7] = mem[OFF_DENSE_B +  7];
+    assign dense_b[ 8] = mem[OFF_DENSE_B +  8];
+    assign dense_b[ 9] = mem[OFF_DENSE_B +  9];
+    assign dense_b[10] = mem[OFF_DENSE_B + 10];
+    assign dense_b[11] = mem[OFF_DENSE_B + 11];
+    assign dense_b[12] = mem[OFF_DENSE_B + 12];
+    assign dense_b[13] = mem[OFF_DENSE_B + 13];
+    assign dense_b[14] = mem[OFF_DENSE_B + 14];
+    assign dense_b[15] = mem[OFF_DENSE_B + 15];
+    assign dense_b[16] = mem[OFF_DENSE_B + 16];
+    assign dense_b[17] = mem[OFF_DENSE_B + 17];
 
 endmodule
