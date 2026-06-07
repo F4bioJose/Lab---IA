@@ -4,7 +4,7 @@
 //            Recebe imagem 64×64 grayscale via UART serial a 230400 baud,
 //            armazena em framebuffer interno (altsyncram dual-port) e exibe
 //            no monitor VGA com scaling 6× (384×384 centrada em 640×480).
-// Placa: DE2-115 (EP4CE115F29C7)
+// Placa: DE2-115 (EP4CE115F29C7) 
 // ==============================================================================
 module system_top (
     // Clock & Reset
@@ -13,6 +13,9 @@ module system_top (
 
     // UART (RS-232 RXD via transceiver MAX3232 da DE2-115)
     input  wire        UART_RXD,
+	 
+	 // ID das Classes (rostos)
+	 //wire         class_id, 
 
     // VGA DAC (ADV7123 na DE2-115)
     output wire        VGA_CLK,
@@ -27,6 +30,7 @@ module system_top (
     // LEDs de depuração
     output wire        LEDG,        // LEDG[0] na placa = frame recebido
     output wire [9:0]  LEDR         // LEDR[9:0] = progresso da escrita UART
+	
 );
 
     // =========================================================================
@@ -198,9 +202,21 @@ module system_top (
     localparam H_OFFSET = 10'd128;
     localparam V_OFFSET = 10'd48;
     localparam IMG_SPAN = 10'd384;  // 64 * 6
+	 
+	 // 1. Sprite de texto (ROM): 256x32 
+	 localparam H_START_SPRITE = 10'd192;
+	 localparam V_START_SPRITE = 10'd440;
+	 localparam W_SPRITE = 10'd256;
+	 localparam H_SPRITE = 10'd32; 
+	 
+	 // -=-=-=-=-=-=-=-=-=-
 
     wire in_image = (pixel_x >= H_OFFSET) && (pixel_x < (H_OFFSET + IMG_SPAN)) &&
                     (pixel_y >= V_OFFSET) && (pixel_y < (V_OFFSET + IMG_SPAN));
+						  
+	 // mesma logica do in_image
+	 wire in_sprite_window = (pixel_x >= H_START_SPRITE) && (pixel_x < (H_START_SPRITE + W_SPRITE)) &&
+                            (pixel_y >= V_START_SPRITE) && (pixel_y < (V_START_SPRITE + H_SPRITE));
 
     wire [9:0]  local_x = pixel_x - H_OFFSET;   // 0–383 dentro da imagem
     wire [9:0]  local_y = pixel_y - V_OFFSET;    // 0–383 dentro da imagem
@@ -217,13 +233,33 @@ module system_top (
         else
             fb_rd_addr = 12'd0;
     end
+	 
+	 
+	 // 5.1 Mapeamento de coordenadas para nomes 
+	 
+	 wire access_granted = SW[17]; 
+	 // Fios dos Switches
+	 wire [4:0] class_id_simulado = SW[4:0]; // total de nomes e 19 - necessario 5 bits
+	 
+	 wire [7:0] sprite_x = (pixel_x - H_START_SPRITE); // representar 256 
+	 wire [4:0] sprite_y = (pixel_y - V_START_SPRITE); // representar 32 
+	 wire [12:0] pixel_atual_offset = (sprite_y * 10'd256) + sprite_x; 
+	 wire [17:0] endereco_base_aluno = {class_id_simulado, 13'd0}; //big shift de 13 casas
+	 wire [17:0] endereco_mega_rom = endereco_base_aluno + pixel_atual_offset; 
+	 wire pixel_do_sprite;
+	  
+	  rom_sprites rom_sprites_inst (
+        .clock   (clk_25mhz),
+        .address (endereco_mega_rom),
+        .q       (pixel_do_sprite)
+    );
 
     // =========================================================================
     // 6. COMPENSAÇÃO DE LATÊNCIA (1 ciclo de pipeline)
     //    A leitura do altsyncram possui 1 ciclo de latência registrada.
     //    Todos os sinais de controle devem ser atrasados igualmente.
     // =========================================================================
-    reg hs_d, vs_d, video_on_d, in_image_d;
+    reg hs_d, vs_d, video_on_d, in_image_d, in_sprite_window_d; 
 
     always @(posedge clk_25mhz or posedge reset) begin
         if (reset) begin
@@ -231,11 +267,13 @@ module system_top (
             vs_d       <= 1'b1;
             video_on_d <= 1'b0;
             in_image_d <= 1'b0;
+				in_sprite_window_d <= 1'b0;
         end else begin
             hs_d       <= hsync_raw;
             vs_d       <= vsync_raw;
             video_on_d <= video_on_raw;
             in_image_d <= in_image;
+				in_sprite_window_d <= in_sprite_window; 
         end
     end
 
@@ -246,6 +284,10 @@ module system_top (
     // =========================================================================
     // 7. RENDERIZAÇÃO VGA — Composição final dos pixels
     // =========================================================================
+	 
+	
+	 
+	 
     always @(*) begin
         if (!video_on_d) begin
             // Fora da área visível: preto obrigatório
@@ -259,6 +301,16 @@ module system_top (
             VGA_G = fb_rd_data;
             VGA_B = fb_rd_data;
         end
+		  else if (in_sprite_window_d) begin
+				if (pixel_do_sprite == 1'b1) begin
+					
+					VGA_R = (access_granted) ? 8'h00 : 8'hFF;
+					VGA_G = (access_granted) ? 8'hFF : 8'h00;
+					VGA_B = 8'h00;
+				end else begin
+					VGA_R = 8'h10; VGA_G = 8'h10; VGA_B = 8'h10; 
+				end
+		  end 
         else begin
             // Fundo: preto
             VGA_R = 8'd0;
@@ -266,11 +318,13 @@ module system_top (
             VGA_B = 8'd0;
         end
     end
+	 
+	 
 
     // =========================================================================
     // 8. LEDs DE DEPURAÇÃO
     // =========================================================================
     assign LEDG       = frame_received;
-    assign LEDR       = uart_wr_addr;
+    assign LEDR       = uart_wr_addr[11:2];
 
 endmodule
