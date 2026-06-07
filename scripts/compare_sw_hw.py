@@ -181,7 +181,7 @@ def plot_histograms(layers_data: dict, out_path: str) -> None:
                 linewidth=0.4, alpha=0.85)
         ax.axvline(0, color="black", linestyle="--", linewidth=1.2, label="Erro = 0")
         ax.set_title(f"Camada: {label}", fontsize=13, fontweight="bold")
-        ax.set_xlabel("Erro  HW − SW  (unidades Q2.14)", fontsize=10)
+        ax.set_xlabel("Erro  HW − SW  (unidades quantizadas)", fontsize=10)
         ax.set_ylabel("Contagem", fontsize=10)
         ax.legend(fontsize=9)
         ax.yaxis.set_major_locator(MaxNLocator(integer=True))
@@ -221,8 +221,8 @@ def plot_scatters(layers_data: dict, out_path: str) -> None:
                 linewidth=1.5, label="Ideal (y = x)")
 
         ax.set_title(f"Camada: {label}", fontsize=13, fontweight="bold")
-        ax.set_xlabel("SW (Q2.14)", fontsize=10)
-        ax.set_ylabel("HW (Q2.14)", fontsize=10)
+        ax.set_xlabel("SW (Quantizado)", fontsize=10)
+        ax.set_ylabel("HW (Quantizado)", fontsize=10)
         ax.legend(fontsize=9, markerscale=3)
         ax.grid(alpha=0.3)
 
@@ -259,7 +259,7 @@ def plot_scores(sw_scores: np.ndarray, hw_scores: np.ndarray, out_path: str) -> 
     # Labels curtos para o eixo X
     short_labels = ["Desc"] + [f"{i}" for i in range(1, n_classes)]
     ax.set_xlabel("Classe", fontsize=11)
-    ax.set_ylabel("Score (Q2.14)", fontsize=11)
+    ax.set_ylabel("Score (Q6.10)", fontsize=11)
     ax.set_title("Scores Finais — SW vs. HW (19 Classes | Classe 0 = Desconhecido)",
                  fontsize=14, fontweight="bold")
     ax.set_xticks(x)
@@ -379,13 +379,28 @@ def main():
     parser = argparse.ArgumentParser(
         description="Compara ativações SW (Keras) vs. HW (Verilog) por camada"
     )
-    parser.add_argument("--sw-dir",    default="comparacao/sw/",
+    parser.add_argument("--image", default=None,
+                        help="Caminho para a imagem, para inferir diretórios automaticamente")
+    parser.add_argument("--sw-dir",    default=None,
                         help="Diretório com arquivos *_sw.txt")
-    parser.add_argument("--hw-dir",    default="comparacao/hw/",
+    parser.add_argument("--hw-dir",    default=None,
                         help="Diretório com arquivos do testbench Verilog")
-    parser.add_argument("--outdir",    default="comparacao/plots/",
+    parser.add_argument("--outdir",    default=None,
                         help="Diretório de saída para gráficos e relatório")
     args = parser.parse_args()
+
+    if args.image:
+        base_name = os.path.splitext(os.path.basename(args.image))[0]
+        if not args.sw_dir:
+            args.sw_dir = os.path.join("comparacao", "sw", base_name)
+        if not args.hw_dir:
+            args.hw_dir = os.path.join("comparacao", "hw", base_name)
+        if not args.outdir:
+            args.outdir = os.path.join("comparacao", "plots", base_name)
+    else:
+        if not args.sw_dir: args.sw_dir = "comparacao/sw/"
+        if not args.hw_dir: args.hw_dir = "comparacao/hw/"
+        if not args.outdir: args.outdir = "comparacao/plots/"
 
     os.makedirs(args.outdir, exist_ok=True)
 

@@ -13,8 +13,8 @@
 //   - Entrada x_in: Q2.14 (16 bits com sinal)
 //   - Pesos w_in:   INT8  (8 bits com sinal, quantizados Q1.7)
 //   - Produto:      Q3.21 (24 bits, estendido para 48 para o acumulador)
-//   - Bias:         INT8, escalado para Q2.14 (deslocado 14 bits)
-//   - Saída scores: Q2.14 (16 bits com sinal, saturado em [-32768, 32767])
+//   - Bias:         INT8, escalado para Q3.21 (deslocado 14 bits)
+//   - Saída scores: Q6.10 (16 bits com sinal, saturado em [-32768, 32767])
 // ==============================================================================
 module dense_900x19_scores #(
     parameter integer INPUT_SIZE    = 900,
@@ -93,26 +93,26 @@ module dense_900x19_scores #(
     assign fsum[17] = acc[17] + $signed({{24{prod[17][23]}}, prod[17]}) + $signed({{26{bias_in[17][7]}}, bias_in[17], 14'b0});
     assign fsum[18] = acc[18] + $signed({{24{prod[18][23]}}, prod[18]}) + $signed({{26{bias_in[18][7]}}, bias_in[18], 14'b0});
 
-    // Conversão Q3.21 → Q2.14: right shift aritmético de 7 bits
-    assign lval[ 0] = fsum[ 0] >>> 7;
-    assign lval[ 1] = fsum[ 1] >>> 7;
-    assign lval[ 2] = fsum[ 2] >>> 7;
-    assign lval[ 3] = fsum[ 3] >>> 7;
-    assign lval[ 4] = fsum[ 4] >>> 7;
-    assign lval[ 5] = fsum[ 5] >>> 7;
-    assign lval[ 6] = fsum[ 6] >>> 7;
-    assign lval[ 7] = fsum[ 7] >>> 7;
-    assign lval[ 8] = fsum[ 8] >>> 7;
-    assign lval[ 9] = fsum[ 9] >>> 7;
-    assign lval[10] = fsum[10] >>> 7;
-    assign lval[11] = fsum[11] >>> 7;
-    assign lval[12] = fsum[12] >>> 7;
-    assign lval[13] = fsum[13] >>> 7;
-    assign lval[14] = fsum[14] >>> 7;
-    assign lval[15] = fsum[15] >>> 7;
-    assign lval[16] = fsum[16] >>> 7;
-    assign lval[17] = fsum[17] >>> 7;
-    assign lval[18] = fsum[18] >>> 7;
+    // Conversão Q3.21 → Q6.10: right shift aritmético de 11 bits
+    assign lval[ 0] = fsum[ 0] >>> 11;
+    assign lval[ 1] = fsum[ 1] >>> 11;
+    assign lval[ 2] = fsum[ 2] >>> 11;
+    assign lval[ 3] = fsum[ 3] >>> 11;
+    assign lval[ 4] = fsum[ 4] >>> 11;
+    assign lval[ 5] = fsum[ 5] >>> 11;
+    assign lval[ 6] = fsum[ 6] >>> 11;
+    assign lval[ 7] = fsum[ 7] >>> 11;
+    assign lval[ 8] = fsum[ 8] >>> 11;
+    assign lval[ 9] = fsum[ 9] >>> 11;
+    assign lval[10] = fsum[10] >>> 11;
+    assign lval[11] = fsum[11] >>> 11;
+    assign lval[12] = fsum[12] >>> 11;
+    assign lval[13] = fsum[13] >>> 11;
+    assign lval[14] = fsum[14] >>> 11;
+    assign lval[15] = fsum[15] >>> 11;
+    assign lval[16] = fsum[16] >>> 11;
+    assign lval[17] = fsum[17] >>> 11;
+    assign lval[18] = fsum[18] >>> 11;
 
     // =========================================================================
     // Lógica sequencial de acumulação

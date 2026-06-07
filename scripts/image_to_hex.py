@@ -59,9 +59,13 @@ def quantize_to_q17(frame_u8: np.ndarray) -> np.ndarray:
 def main():
     parser = argparse.ArgumentParser(description="Converte imagem para formato hex 32x32 para testbench.")
     parser.add_argument("input_img", type=str, help="Caminho da imagem de entrada (ex: foto.jpg)")
-    parser.add_argument("output_txt", type=str, help="Caminho do arquivo texto de saída (ex: foto_hex.txt)")
+    parser.add_argument("output_txt", type=str, nargs="?", default=None, help="Caminho do arquivo texto de saída (opcional, ex: foto_hex.txt)")
     parser.add_argument("--no-haar", action="store_true", help="Pula a detecção de rosto e usa a imagem inteira")
     args = parser.parse_args()
+
+    if args.output_txt is None:
+        base_name = os.path.splitext(os.path.basename(args.input_img))[0]
+        args.output_txt = os.path.join("inputs", "imgs_hex", f"{base_name}_hex.txt")
 
     if not os.path.isfile(args.input_img):
         print(f"[ERRO] Imagem não encontrada: {args.input_img}")

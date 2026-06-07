@@ -110,6 +110,10 @@ def dequantize_q2_14(x: np.ndarray) -> np.ndarray:
     """Converte inteiro Q2.14 → float (para verificação)."""
     return x.astype(np.float32) / Q_SCALE
 
+def quantize_q6_10(x: np.ndarray) -> np.ndarray:
+    """Converte float → inteiro Q6.10 saturado em INT16."""
+    return np.clip(np.round(x * (2 ** 10)), Q_MIN, Q_MAX).astype(np.int32)
+
 
 # ---------------------------------------------------------------------------
 # Pré-processamento com Haar Cascade
@@ -314,11 +318,11 @@ def save_dense(act: np.ndarray, path: str, img_file: str) -> None:
     """
     data = act[0].flatten()
     n_classes = len(data)
-    q = quantize_q2_14(data)
+    q = quantize_q6_10(data)
 
     with open(path, "w") as f:
         f.write(f"# Layer: dense | Image: {img_file} | "
-                f"Format: s0..s{n_classes-1} (Q2.14 signed) | "
+                f"Format: s0..s{n_classes-1} (Q6.10 signed) | "
                 f"Classe 0=Desconhecido, 1..{n_classes-1}=Pessoas\n")
         f.write(" ".join(str(v) for v in q) + "\n")
 
@@ -365,13 +369,12 @@ def main():
     )
     args = parser.parse_args()
 
-    # Resolução do diretório de saída: subpasta automática por imagem+timestamp
+    # Resolução do diretório de saída: subpasta automática por imagem
     img_stem = os.path.splitext(os.path.basename(args.image))[0]
     if args.outdir:
         outdir = args.outdir
     else:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        outdir = os.path.join("comparacao", f"{img_stem}_{timestamp}", "sw")
+        outdir = os.path.join("comparacao", "sw", img_stem)
 
     os.makedirs(outdir, exist_ok=True)
 

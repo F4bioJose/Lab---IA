@@ -23,7 +23,7 @@
 //   conv_out.txt : "f0 f1 f2 f3\n"          (4 valores Q2.14 com sinal)
 //   pool_out.txt : "val\n"                   (1 valor Q2.14 por canal serializado)
 //   flat_out.txt : "val\n"                   (1 valor Q2.14)
-//   dense_out.txt: "s0 s1 ... s18\n"         (19 scores Q2.14 com sinal)
+//   dense_out.txt: "s0 s1 ... s18\n"         (19 scores Q6.10 com sinal)
 //
 // Uso no ModelSim/Questa:
 //   vsim tb_cnn_layer_capture +IMG=inputs/teste2.txt +OUTDIR=comparacao/hw/
@@ -220,7 +220,7 @@ module tb_cnn_layer_capture;
         $fwrite(fd_conv,  "# Layer: conv | Image: %s | Format: f0 f1 f2 f3 (Q2.14 signed)\n", img_file);
         $fwrite(fd_pool,  "# Layer: pool | Image: %s | Format: val (Q2.14 signed)\n",          img_file);
         $fwrite(fd_flat,  "# Layer: flat | Image: %s | Format: val (Q2.14 signed)\n",           img_file);
-        $fwrite(fd_dense, "# Layer: dense | Image: %s | Format: s0..s18 (Q2.14 signed) | Classe 0=Desconhecido, 1..18=Pessoas\n", img_file);
+        $fwrite(fd_dense, "# Layer: dense | Image: %s | Format: s0..s18 (Q6.10 signed) | Classe 0=Desconhecido, 1..18=Pessoas\n", img_file);
 
         // -- Carrega imagem --
         $readmemh(img_file, img_mem);
@@ -260,10 +260,10 @@ module tb_cnn_layer_capture;
         $display("[TB] ===== INFERÊNCIA CONCLUÍDA =====");
         $display("[TB] class_id   = %0d", class_id);
         $display("[TB] unknown    = %0b (classe 0 = Desconhecido nativo)", unknown);
-        $display("[TB] max_score  = %0d (Q2.14 = %f)", $signed(final_result),
-                 $signed(final_result) / 16384.0);
+        $display("[TB] max_score  = %0d (Q6.10 = %f)", $signed(final_result),
+                 $signed(final_result) / 1024.0);
 
-        $display("[TB] Dense scores (Q2.14 → float):");
+        $display("[TB] Dense scores (Q6.10 → float):");
         $display("[TB]   s[ 0]=%-6d [Desconhecido]",    $signed(dut.dense_scores[ 0]));
         $display("[TB]   s[ 1]=%-6d  s[ 2]=%-6d  s[ 3]=%-6d",
             $signed(dut.dense_scores[ 1]),

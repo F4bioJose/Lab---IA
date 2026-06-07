@@ -105,10 +105,9 @@ Lab---IA/
 
 ## Fluxo de Trabalho
 
-### 1 · Pré-processamento Padrão
+### Pré-processamento Padrão
 
-Todos os scripts seguem rigorosamente o pipeline definido em `rede_pipeline/src/preprocessor.py`:
-
+Todos os scripts sob o capô seguem rigorosamente o pipeline definido em `rede_pipeline/src/preprocessor.py`:
 1. Conversão para escala de cinza
 2. CLAHE (`clipLimit=2.0, tileGridSize=(8,8)`)
 3. Detecção facial adaptativa em cascata: `[(1.2,5,60), (1.1,3,40), (1.05,2,30)]`
@@ -116,49 +115,61 @@ Todos os scripts seguem rigorosamente o pipeline definido em `rede_pipeline/src/
 5. Resize para 32×32 com `INTER_AREA`
 6. Normalização: `/255.0` (SW) ou quantização Q1.7 (HW)
 
-### 2 · Simulação (Questa/ModelSim)
+### 1 · Pipeline Automatizado Completo (Recomendado)
 
-O script `run_project.do` unifica compilação e simulação num fluxo único:
+A forma mais simples de testar o projeto de ponta a ponta é usar o script de automação `run_pipeline.sh`. Ele unifica a conversão da imagem, simulação do hardware, extração do software e geração dos gráficos comparativos.
 
-```tcl
-# Simula com a imagem padrão
-do scripts/run_project.do
+```bash
+# Executa todo o pipeline a partir de uma imagem .jpg em inputs/
+./scripts/run_pipeline.sh anna.jpg
+```
 
-# Simula com outra imagem
-do scripts/run_project.do inputs/frame0_hex.txt
+O script buscará a imagem e gerará todos os resultados na pasta `comparacao/plots/anna/`, incluindo o relatório (`report.txt`) e gráficos detalhados por camada.
 
-# Simula e salva saídas em pasta específica
-do scripts/run_project.do inputs/anna_hex.txt comparacao/anna/hw/
+### 2 · Passo a Passo Individual (Para Depuração)
+
+Se preferir rodar as etapas de forma isolada, os scripts foram desenhados para deduzir automaticamente as pastas de saída.
+
+#### A. Conversão da Imagem para Hexadecimal
+
+Converte uma imagem `.jpg` em um `.txt` hexadecimal Q1.7, já extraindo o rosto.
+```bash
+# Salva automaticamente em inputs/imgs_hex/anna_hex.txt
+python scripts/image_to_hex.py inputs/anna.jpg
+```
+
+#### B. Simulação de Hardware (Questa/ModelSim)
+
+Executa a inferência na CNN em Verilog. O diretório de saída será gerado automaticamente com base no nome do arquivo `.txt`.
+```bash
+# Salva saídas em comparacao/hw/anna/
+do scripts/run_project.do inputs/imgs_hex/anna_hex.txt
 ```
 
 **Saídas geradas:**
-
 | Arquivo | Conteúdo |
 |---|---|
 | `conv_out.txt` | Ativações conv pós-ReLU: `f0 f1 f2 f3` por linha (Q2.14) |
 | `pool_out.txt` | Saídas do Max Pooling serializadas (Q2.14) |
 | `flat_out.txt` | Vetor Flatten de 900 elementos (Q2.14) |
-| `dense_out.txt` | 19 scores finais em uma linha (Q2.14) |
+| `dense_out.txt` | 19 scores finais em uma linha (Q6.10) |
 
-### 3 · Comparação SW vs. HW
+#### C. Extração das Ativações de Software (Keras)
 
+Executa a imagem no modelo Keras para extrair as respostas "ideais" do software. A pasta de destino também é deduzida automaticamente do nome da imagem.
 ```bash
-# Extrai ativações do modelo Keras (cria subpasta automática)
+# Salva saídas em comparacao/sw/anna/
 python scripts/extract_sw_activations.py \
     --model tiny_cnn_multiclasse.h5 \
     --image inputs/anna.jpg
+```
 
-# Com diretório explícito
-python scripts/extract_sw_activations.py \
-    --model tiny_cnn_multiclasse.h5 \
-    --image inputs/anna.jpg \
-    --outdir comparacao/anna/sw/
+#### D. Comparação SW vs. HW e Gráficos
 
-# Gera gráficos de comparação
-python scripts/compare_sw_hw.py \
-    --sw-dir comparacao/anna/sw/ \
-    --hw-dir comparacao/anna/hw/ \
-    --outdir comparacao/anna/plots/
+O script de comparação cruza os dados do Software com o Hardware e plota tudo. Basta passar a imagem de entrada e ele localizará as pastas do passo B e C automaticamente.
+```bash
+# Lê comparacao/sw/anna e comparacao/hw/anna, salvando os gráficos em comparacao/plots/anna/
+python scripts/compare_sw_hw.py --image inputs/anna.jpg
 ```
 
 ### 4 · Enviar imagem para a FPGA
@@ -206,6 +217,6 @@ pip install tensorflow opencv-python numpy matplotlib scipy pyserial
 
 ## Documentação Técnica
 
-- **[Arquitetura e Pipeline](explicacoes/pipeline.md)** — Fluxo de dados completo, detalhamento de cada módulo, formatos numéricos (Q1.7 / Q2.14 / Q3.21)
+- **[Arquitetura e Pipeline](explicacoes/pipeline.md)** — Fluxo de dados completo, detalhamento de cada módulo, formatos numéricos (Q1.7 / Q2.14 / Q3.21 / Q6.10)
 - **[Máquinas de Estado](explicacoes/FSM.md)** — FSM de inferência e lógica de captura dos LEDs, diagramas Mermaid
 - **[Fluxo de Testagem](explicacoes/fluxo_de_testes_hw_sw.md)** — Guia passo a passo para validação SW vs. HW

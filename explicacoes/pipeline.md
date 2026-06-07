@@ -77,7 +77,7 @@ UART_RXD (pino AB21 da DE2-115)
  ▼ dense_900x19.v   (dense_900x19_scores)
  │ 19 acumuladores paralelos em Q3.21 (48 bits cada)
  │ A cada flat_valid: acc[i] += x_in × weight_rom[dense_addr][i]
- │ Após 900 entradas: acc[i] += bias[i] → shift_right 7 → Q2.14
+ │ Após 900 entradas: acc[i] += bias[i] → shift_right 11 → Q6.10
  │ Saturação INT16 [-32768, +32767]
  │ Emite: scores[0..18][15:0] + valid_out + done
  │
@@ -285,10 +285,11 @@ Sinais-chave do barramento interno:
 | Formato | Bits | Sinal | Inteiro | Fracionário | Intervalo | Resolução | Uso |
 |---------|------|-------|---------|-------------|-----------|-----------|-----|
 | INT8 (Q1.7) | 8 | 1 | 0 | 7 | [-1.0, +0.992] | 1/128 | Pesos da ROM |
-| Q2.14 | 16 | 1 | 1 | 14 | [-2.0, +1.999] | 1/16384 ≈ 6×10⁻⁵ | Ativações, scores |
+| Q2.14 | 16 | 1 | 1 | 14 | [-2.0, +1.999] | 1/16384 ≈ 6×10⁻⁵ | Ativações (Conv/Pool/Flat) |
 | Q3.21 | 48 | 1 | 2 | 21 | — | — | Acumuladores internos da dense |
+| Q6.10 | 16 | 1 | 5 | 10 | [-32.0, +31.999] | 1/1024 ≈ 1×10⁻³ | Scores (Camada Densa) |
 
-A conversão Q3.21 → Q2.14 ocorre por deslocamento aritmético de 7 bits à direita (`>>> 7`), seguida de saturação INT16.
+A conversão Q3.21 → Q6.10 na camada Densa ocorre por deslocamento aritmético de 11 bits à direita (`>>> 11`), seguida de saturação INT16.
 
 ---
 
@@ -309,7 +310,7 @@ O testbench instancia diretamente o `cnn_top` (não o `fpga_top_de2115`) para ac
 | `conv_valid` | `conv_out.txt` | `f0 f1 f2 f3` (Q2.14 com sinal) |
 | `pool_valid` | `pool_out.txt` | `val` (Q2.14) |
 | `flat_valid` | `flat_out.txt` | `val` (Q2.14) |
-| `dense_valid` | `dense_out.txt` | `s0 s1 … s17` (18 scores Q2.14) |
+| `dense_valid` | `dense_out.txt` | `s0 s1 … s18` (19 scores Q6.10) |
 
 **Uso:**
 ```tcl

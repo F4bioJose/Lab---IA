@@ -33,7 +33,7 @@
 // Saídas:
 //   - class_id [4:0]: 0–18 = classe identificada (0 = desconhecido)
 //   - unknown: 1 quando a rede prediz a classe "Desconhecido" (índice 0)
-//   - max_score: valor Q2.14 do maior score encontrado
+//   - max_score: valor Q6.10 do maior score encontrado
 // ==============================================================================
 module argmax_19 (
     input  wire        clk,

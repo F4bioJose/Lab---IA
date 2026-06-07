@@ -24,7 +24,10 @@ if {[info exists 1] && $1 ne ""} {
 if {[info exists 2] && $2 ne ""} {
     set out_dir $2
 } else {
-    set out_dir "comparacao/hw/"
+    set tail [file tail $img_file]
+    set base_name [file rootname $tail]
+    set base_name [regsub {_hex$} $base_name ""]
+    set out_dir "comparacao/hw/${base_name}/"
 }
 
 # -----------------------------------------------------------------
@@ -72,7 +75,7 @@ vlog -sv -work work \
     $src/cnn_top.v             \
     $src/tb_cnn_layer_capture.v
 
-echo "[OK] Compilação concluída com sucesso."
+echo "\[OK\] Compilação concluída com sucesso."
 
 # -----------------------------------------------------------------
 # 4. Simulação
@@ -109,3 +112,6 @@ echo " Próximo passo (comparação SW/HW):"
 echo "   python scripts/extract_sw_activations.py --model tiny_cnn_multiclasse.h5 --image foto.jpg"
 echo "   python scripts/compare_sw_hw.py --hw-dir $out_dir"
 echo "============================================================"
+
+# Sai do QuestaSim/ModelSim sem pedir confirmação
+quit -f
