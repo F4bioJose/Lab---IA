@@ -14,6 +14,8 @@ module system_top (
     // UART (RS-232 RXD via transceiver MAX3232 da DE2-115)
     input  wire        UART_RXD,
 	 
+	 input  wire [17:0] SW,
+	 
 	 // ID das Classes (rostos)
 	 //wire         class_id, 
 
