@@ -217,6 +217,7 @@ pip install tensorflow opencv-python numpy matplotlib scipy pyserial
 
 ## Documentação Técnica
 
+- **[Métricas e Gráficos do Relatório](explicacoes/metricas_e_graficos.md)** — Explicação minuciosa (MAE, RMSE, Pearson) de validação do Hardware.
 - **[Arquitetura e Pipeline](explicacoes/pipeline.md)** — Fluxo de dados completo, detalhamento de cada módulo, formatos numéricos (Q1.7 / Q2.14 / Q3.21 / Q6.10)
 - **[Máquinas de Estado](explicacoes/FSM.md)** — FSM de inferência e lógica de captura dos LEDs, diagramas Mermaid
 - **[Fluxo de Testagem](explicacoes/fluxo_de_testes_hw_sw.md)** — Guia passo a passo para validação SW vs. HW
