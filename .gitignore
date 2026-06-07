@@ -8,10 +8,39 @@
 *.mpv
 *.zip
 
+# Pastas com dados gerados ou temporários
+imagens
+inputs
+comparacao/
+videos/
+
+# Python
+.venv/
+venv/
+uv.lock
+__pycache__/
+*.pyc
+*.py[cod]
+*$py.class
+
+# IDEs
+.idea/
+.vscode/
+
+# Dados e Logs (Treinamento)
+data/
+tuner_logs/
+models/
+mlruns/
+*.db
+rede_pipeline/docs/
+rede_pipeline/reports/
+
 # Arquivos gerados pelo Quartus (Mantenha apenas os .qpf, .qsf e .sdc no Git)
 quartus_cnn/output_files/
 quartus_cnn/db/
 quartus_cnn/incremental_db/
+quartus_cnn/simulation/
 quartus_cnn/*.rpt
 quartus_cnn/*.smsg
 quartus_cnn/*.summary
@@ -23,8 +52,12 @@ quartus_cnn/*.qws
 # Arquivos gerados pelo ModelSim / Simulador
 *.wlf
 transcript
+modelsim.ini
 work/
 
-# Python
-__pycache__/
-*.pyc
+# Arquivos de exportação dinâmica da rede
+rede_pipeline/export/
+
+# Notebooks de testagem
+notebooks_rede/
+

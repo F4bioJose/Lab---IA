@@ -1,21 +1,24 @@
 `timescale 1ns/1ps
 
 // ==============================================================================
-// Módulo: dense_900x18_scores
+// Módulo: dense_900x19_scores
 // Descrição: Camada densa (Fully Connected) que recebe o mapa final achatado
 //            (900 elementos) e gera os scores brutos (logits em Q2.14) para
-//            as 18 classes da rede neural de forma acumulativa.
+//            as 19 classes da rede neural de forma acumulativa.
+//
+// Mapeamento de Classes:
+//   0 = Desconhecido (classe nativa), 1..18 = pessoas identificadas
 //
 // Aritmética:
 //   - Entrada x_in: Q2.14 (16 bits com sinal)
-//   - Pesos w_in:   INT8  (8 bits com sinal)
+//   - Pesos w_in:   INT8  (8 bits com sinal, quantizados Q1.7)
 //   - Produto:      Q3.21 (24 bits, estendido para 48 para o acumulador)
 //   - Bias:         INT8, escalado para Q2.14 (deslocado 14 bits)
 //   - Saída scores: Q2.14 (16 bits com sinal, saturado em [-32768, 32767])
 // ==============================================================================
-module dense_900x18_scores #(
+module dense_900x19_scores #(
     parameter integer INPUT_SIZE    = 900,
-    parameter integer OUTPUT_CLASSES = 18
+    parameter integer OUTPUT_CLASSES = 19
 )(
     input  wire        clk,
     input  wire        rst,
@@ -36,12 +39,12 @@ module dense_900x18_scores #(
     reg [9:0] sample_count;
 
     // Acumuladores Q3.21 por classe (48 bits para evitar overflow durante acúmulo)
-    reg signed [47:0] acc [ 0:17];
+    reg signed [47:0] acc [ 0:18];
 
     // Wires intermediários para produtos e soma final por classe
-    wire signed [23:0] prod [ 0:17];
-    wire signed [47:0] fsum [ 0:17];
-    wire signed [47:0] lval [ 0:17];
+    wire signed [23:0] prod [ 0:18];
+    wire signed [47:0] fsum [ 0:18];
+    wire signed [47:0] lval [ 0:18];
 
     // -------------------------------------------------------------------------
     // Produtos combinacionais: x_in × w_in[c] → Q3.21 (24 bits)
@@ -64,6 +67,7 @@ module dense_900x18_scores #(
     assign prod[15] = $signed(x_in) * $signed(w_in[15]);
     assign prod[16] = $signed(x_in) * $signed(w_in[16]);
     assign prod[17] = $signed(x_in) * $signed(w_in[17]);
+    assign prod[18] = $signed(x_in) * $signed(w_in[18]);
 
     // -------------------------------------------------------------------------
     // Soma final (último sample): acc + produto + bias escalado
@@ -87,6 +91,7 @@ module dense_900x18_scores #(
     assign fsum[15] = acc[15] + $signed({{24{prod[15][23]}}, prod[15]}) + $signed({{26{bias_in[15][7]}}, bias_in[15], 14'b0});
     assign fsum[16] = acc[16] + $signed({{24{prod[16][23]}}, prod[16]}) + $signed({{26{bias_in[16][7]}}, bias_in[16], 14'b0});
     assign fsum[17] = acc[17] + $signed({{24{prod[17][23]}}, prod[17]}) + $signed({{26{bias_in[17][7]}}, bias_in[17], 14'b0});
+    assign fsum[18] = acc[18] + $signed({{24{prod[18][23]}}, prod[18]}) + $signed({{26{bias_in[18][7]}}, bias_in[18], 14'b0});
 
     // Conversão Q3.21 → Q2.14: right shift aritmético de 7 bits
     assign lval[ 0] = fsum[ 0] >>> 7;
@@ -107,6 +112,7 @@ module dense_900x18_scores #(
     assign lval[15] = fsum[15] >>> 7;
     assign lval[16] = fsum[16] >>> 7;
     assign lval[17] = fsum[17] >>> 7;
+    assign lval[18] = fsum[18] >>> 7;
 
     // =========================================================================
     // Lógica sequencial de acumulação
@@ -122,12 +128,14 @@ module dense_900x18_scores #(
             acc[ 9] <= 48'sd0; acc[10] <= 48'sd0; acc[11] <= 48'sd0;
             acc[12] <= 48'sd0; acc[13] <= 48'sd0; acc[14] <= 48'sd0;
             acc[15] <= 48'sd0; acc[16] <= 48'sd0; acc[17] <= 48'sd0;
+            acc[18] <= 48'sd0;
             scores[ 0] <= 16'sd0; scores[ 1] <= 16'sd0; scores[ 2] <= 16'sd0;
             scores[ 3] <= 16'sd0; scores[ 4] <= 16'sd0; scores[ 5] <= 16'sd0;
             scores[ 6] <= 16'sd0; scores[ 7] <= 16'sd0; scores[ 8] <= 16'sd0;
             scores[ 9] <= 16'sd0; scores[10] <= 16'sd0; scores[11] <= 16'sd0;
             scores[12] <= 16'sd0; scores[13] <= 16'sd0; scores[14] <= 16'sd0;
             scores[15] <= 16'sd0; scores[16] <= 16'sd0; scores[17] <= 16'sd0;
+            scores[18] <= 16'sd0;
         end else begin
             valid_out <= 1'b0;
             done      <= 1'b0;
@@ -137,7 +145,7 @@ module dense_900x18_scores #(
                 // Último sample: finaliza acumulação, aplica bias e satura
                 // -------------------------------------------------------
                 if (sample_count == INPUT_SIZE - 1) begin
-                    // Saturação e armazenamento dos 18 scores
+                    // Saturação e armazenamento dos 19 scores
                     scores[ 0] <= (lval[ 0] > SAT_MAX) ? 16'sd32767 : (lval[ 0] < SAT_MIN) ? 16'sh8000 : lval[ 0][15:0];
                     scores[ 1] <= (lval[ 1] > SAT_MAX) ? 16'sd32767 : (lval[ 1] < SAT_MIN) ? 16'sh8000 : lval[ 1][15:0];
                     scores[ 2] <= (lval[ 2] > SAT_MAX) ? 16'sd32767 : (lval[ 2] < SAT_MIN) ? 16'sh8000 : lval[ 2][15:0];
@@ -156,6 +164,7 @@ module dense_900x18_scores #(
                     scores[15] <= (lval[15] > SAT_MAX) ? 16'sd32767 : (lval[15] < SAT_MIN) ? 16'sh8000 : lval[15][15:0];
                     scores[16] <= (lval[16] > SAT_MAX) ? 16'sd32767 : (lval[16] < SAT_MIN) ? 16'sh8000 : lval[16][15:0];
                     scores[17] <= (lval[17] > SAT_MAX) ? 16'sd32767 : (lval[17] < SAT_MIN) ? 16'sh8000 : lval[17][15:0];
+                    scores[18] <= (lval[18] > SAT_MAX) ? 16'sd32767 : (lval[18] < SAT_MIN) ? 16'sh8000 : lval[18][15:0];
                     // Limpa acumuladores para o próximo frame
                     acc[ 0] <= 48'sd0; acc[ 1] <= 48'sd0; acc[ 2] <= 48'sd0;
                     acc[ 3] <= 48'sd0; acc[ 4] <= 48'sd0; acc[ 5] <= 48'sd0;
@@ -163,6 +172,7 @@ module dense_900x18_scores #(
                     acc[ 9] <= 48'sd0; acc[10] <= 48'sd0; acc[11] <= 48'sd0;
                     acc[12] <= 48'sd0; acc[13] <= 48'sd0; acc[14] <= 48'sd0;
                     acc[15] <= 48'sd0; acc[16] <= 48'sd0; acc[17] <= 48'sd0;
+                    acc[18] <= 48'sd0;
                     sample_count <= 10'd0;
                     valid_out    <= 1'b1;
                     done         <= 1'b1;
@@ -188,6 +198,7 @@ module dense_900x18_scores #(
                     acc[15] <= acc[15] + $signed({{24{prod[15][23]}}, prod[15]});
                     acc[16] <= acc[16] + $signed({{24{prod[16][23]}}, prod[16]});
                     acc[17] <= acc[17] + $signed({{24{prod[17][23]}}, prod[17]});
+                    acc[18] <= acc[18] + $signed({{24{prod[18][23]}}, prod[18]});
                     sample_count <= sample_count + 10'd1;
                 end
             end

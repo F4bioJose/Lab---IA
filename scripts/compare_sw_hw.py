@@ -9,20 +9,19 @@ arquivos sem sufixo _sw).
 Gera métricas quantitativas e os seguintes gráficos:
   1. Histogramas de erro (hw - sw) por camada
   2. Scatter plots SW × HW por camada (com linha ideal y=x)
-  3. Barplot dos 18 scores finais SW × HW com linha de threshold
+  3. Barplot dos 19 scores finais SW × HW (classe 0 = Desconhecido destacado)
   4. Mapa de calor de correlação dos canais da camada conv
 
 Uso:
     python scripts/compare_sw_hw.py \\
         --sw-dir comparacao/sw/ \\
         --hw-dir comparacao/hw/ \\
-        --outdir comparacao/plots/ \\
-        --threshold 0.95
+        --outdir comparacao/plots/
 
 Saídas (em --outdir):
     01_hist_errors.png     — Histogramas de erro por camada
     02_scatter_layers.png  — Scatter SW × HW por camada
-    03_barplot_scores.png  — Comparação de scores finais (18 classes)
+    03_barplot_scores.png  — Comparação de scores finais (19 classes)
     04_heatmap_conv.png    — Correlação dos canais conv
     report.txt             — Resumo textual das métricas
 """
@@ -54,17 +53,40 @@ except ImportError:
 # Configuração visual
 # ---------------------------------------------------------------------------
 COLORS = {
-    "sw"     : "#4C72B0",   # Azul suave
-    "hw"     : "#DD8452",   # Laranja suave
-    "thresh" : "#C44E52",   # Vermelho
-    "error"  : "#55A868",   # Verde
-    "ideal"  : "#808080",   # Cinza
+    "sw"       : "#4C72B0",   # Azul suave
+    "hw"       : "#DD8452",   # Laranja suave
+    "unknown"  : "#C44E52",   # Vermelho (classe 0 = Desconhecido)
+    "error"    : "#55A868",   # Verde
+    "ideal"    : "#808080",   # Cinza
 }
-FIGSIZE_WIDE  = (16, 4)
+FIGSIZE_WIDE  = (18, 4)
 FIGSIZE_SQUARE = (12, 10)
 DPI = 150
 
 Q_SCALE = 2 ** 14  # 16384 (fator Q2.14)
+
+# Mapeamento ID → nome da classe
+CLASS_NAMES = [
+    "Desconhecido",  # 0
+    "Igor",          # 1
+    "Joao",          # 2
+    "Jose Henrique", # 3
+    "Julia",         # 4
+    "Lucio",         # 5
+    "Naira",         # 6
+    "Rafael",        # 7
+    "Samuel",        # 8
+    "Yuri",          # 9
+    "Anna Carol",    # 10
+    "Bruno",         # 11
+    "Diego",         # 12
+    "Eduardo",       # 13
+    "Fabio",         # 14
+    "Felipe",        # 15
+    "Gabriel",       # 16
+    "Horacio",       # 17
+    "Hugo",          # 18
+]
 
 
 # ---------------------------------------------------------------------------
@@ -212,44 +234,50 @@ def plot_scatters(layers_data: dict, out_path: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Plot 3: Barplot dos 18 scores finais SW × HW
+# Plot 3: Barplot dos 19 scores finais SW × HW
+# Classe 0 (Desconhecido) destacada em vermelho
 # ---------------------------------------------------------------------------
-def plot_scores(sw_scores: np.ndarray, hw_scores: np.ndarray,
-                threshold: float, out_path: str) -> None:
+def plot_scores(sw_scores: np.ndarray, hw_scores: np.ndarray, out_path: str) -> None:
     n_classes = max(len(sw_scores), len(hw_scores))
     x = np.arange(n_classes)
     width = 0.38
 
-    fig, ax = plt.subplots(figsize=(14, 5), dpi=DPI)
+    fig, ax = plt.subplots(figsize=(16, 5), dpi=DPI)
+
+    # Cores: classe 0 (Desconhecido) em vermelho, demais em azul/laranja
+    sw_colors = [COLORS["unknown"] if i == 0 else COLORS["sw"] for i in range(n_classes)]
+    hw_colors = [COLORS["unknown"] if i == 0 else COLORS["hw"] for i in range(n_classes)]
 
     bars_sw = ax.bar(x - width / 2, sw_scores[:n_classes], width,
-                     label="SW (Keras)", color=COLORS["sw"], alpha=0.85, zorder=3)
+                     label="SW (Keras)", color=sw_colors, alpha=0.85, zorder=3)
     bars_hw = ax.bar(x + width / 2, hw_scores[:n_classes], width,
-                     label="HW (Verilog)", color=COLORS["hw"], alpha=0.85, zorder=3)
+                     label="HW (Verilog)", color=hw_colors, alpha=0.85, zorder=3)
 
-    # Linha de threshold (em escala Q2.14)
-    thresh_q = int(threshold * Q_SCALE)
-    ax.axhline(thresh_q, color=COLORS["thresh"], linestyle="--", linewidth=1.8,
-               label=f"Threshold {threshold*100:.0f}% = {thresh_q} Q2.14", zorder=4)
+    # Linha zero para referência
+    ax.axhline(0, color="black", linestyle="-", linewidth=0.8, zorder=4)
 
+    # Labels curtos para o eixo X
+    short_labels = ["Desc"] + [f"{i}" for i in range(1, n_classes)]
     ax.set_xlabel("Classe", fontsize=11)
     ax.set_ylabel("Score (Q2.14)", fontsize=11)
-    ax.set_title("Scores Finais — SW vs. HW (18 Classes + Threshold)", fontsize=14,
-                 fontweight="bold")
+    ax.set_title("Scores Finais — SW vs. HW (19 Classes | Classe 0 = Desconhecido)",
+                 fontsize=14, fontweight="bold")
     ax.set_xticks(x)
-    ax.set_xticklabels([str(i) for i in range(n_classes)], fontsize=9)
+    ax.set_xticklabels(short_labels, fontsize=8, rotation=45, ha="right")
     ax.legend(fontsize=10)
     ax.grid(axis="y", alpha=0.3, zorder=0)
 
     # Anotação da classe predita
     sw_pred = int(np.argmax(sw_scores))
     hw_pred = int(np.argmax(hw_scores))
-    ax.annotate(f"SW→{sw_pred}", xy=(sw_pred - width/2, sw_scores[sw_pred]),
+    sw_label = CLASS_NAMES[sw_pred] if sw_pred < len(CLASS_NAMES) else f"C{sw_pred}"
+    hw_label = CLASS_NAMES[hw_pred] if hw_pred < len(CLASS_NAMES) else f"C{hw_pred}"
+    ax.annotate(f"SW→{sw_label}", xy=(sw_pred - width/2, sw_scores[sw_pred]),
                 xytext=(0, 8), textcoords="offset points",
-                ha="center", fontsize=9, color=COLORS["sw"], fontweight="bold")
-    ax.annotate(f"HW→{hw_pred}", xy=(hw_pred + width/2, hw_scores[hw_pred]),
+                ha="center", fontsize=8, color=COLORS["sw"], fontweight="bold")
+    ax.annotate(f"HW→{hw_label}", xy=(hw_pred + width/2, hw_scores[hw_pred]),
                 xytext=(0, 8), textcoords="offset points",
-                ha="center", fontsize=9, color=COLORS["hw"], fontweight="bold")
+                ha="center", fontsize=8, color=COLORS["hw"], fontweight="bold")
 
     plt.tight_layout()
     plt.savefig(out_path, bbox_inches="tight")
@@ -310,16 +338,19 @@ def plot_conv_heatmap(sw_conv: np.ndarray, hw_conv: np.ndarray, out_path: str) -
 # ---------------------------------------------------------------------------
 # Relatório textual
 # ---------------------------------------------------------------------------
-def save_report(metrics_list: list, threshold: float, out_path: str,
+def save_report(metrics_list: list, out_path: str,
                 sw_pred: int, hw_pred: int, agreement: bool) -> None:
+    sw_name = CLASS_NAMES[sw_pred] if sw_pred < len(CLASS_NAMES) else f"Classe_{sw_pred}"
+    hw_name = CLASS_NAMES[hw_pred] if hw_pred < len(CLASS_NAMES) else f"Classe_{hw_pred}"
+    sw_status = "DESCONHECIDO" if sw_pred == 0 else "IDENTIFICADO"
+    hw_status = "DESCONHECIDO" if hw_pred == 0 else "IDENTIFICADO"
     lines = [
         "=" * 60,
-        "  RELATÓRIO DE COMPARAÇÃO SW vs. HW — CNN 18 Classes",
+        "  RELATÓRIO DE COMPARAÇÃO SW vs. HW — CNN 19 Classes",
         "=" * 60,
-        f"  Threshold configurado: {threshold*100:.0f}%  "
-        f"({int(threshold * Q_SCALE)} em Q2.14)",
-        f"  Predição SW : classe {sw_pred}",
-        f"  Predição HW : classe {hw_pred}",
+        f"  Sem threshold — Desconhecido = classe 0 (nativo da rede)",
+        f"  Predição SW : classe {sw_pred} = '{sw_name}' [{sw_status}]",
+        f"  Predição HW : classe {hw_pred} = '{hw_name}' [{hw_status}]",
         f"  Concordância: {'✓ SIM' if agreement else '✗ NÃO'}",
         "-" * 60,
         f"  {'Camada':<10} {'N':>7} {'MAE':>8} {'RMSE':>8} {'MaxErr':>8} {'Exato%':>8} {'Pearson':>9}",
@@ -354,8 +385,6 @@ def main():
                         help="Diretório com arquivos do testbench Verilog")
     parser.add_argument("--outdir",    default="comparacao/plots/",
                         help="Diretório de saída para gráficos e relatório")
-    parser.add_argument("--threshold", type=float, default=0.95,
-                        help="Threshold de confiança (default: 0.95 = 95%%)")
     args = parser.parse_args()
 
     os.makedirs(args.outdir, exist_ok=True)
@@ -366,7 +395,7 @@ def main():
     print(f"  SW dir    : {args.sw_dir}")
     print(f"  HW dir    : {args.hw_dir}")
     print(f"  Output    : {args.outdir}")
-    print(f"  Threshold : {args.threshold * 100:.0f}%")
+
     print("=" * 60)
 
     # -----------------------------------------------------------------------
@@ -411,7 +440,7 @@ def main():
                       os.path.join(args.outdir, "02_scatter_layers.png"))
 
     if sw_dense is not None and hw_dense is not None:
-        plot_scores(sw_dense, hw_dense, args.threshold,
+        plot_scores(sw_dense, hw_dense,
                     os.path.join(args.outdir, "03_barplot_scores.png"))
 
     if "conv" in layers_data:
@@ -426,7 +455,7 @@ def main():
     hw_pred = int(np.argmax(hw_dense)) if hw_dense is not None else -1
     agreement = (sw_pred == hw_pred)
 
-    save_report(metrics_list, args.threshold,
+    save_report(metrics_list,
                 os.path.join(args.outdir, "report.txt"),
                 sw_pred, hw_pred, agreement)
 

@@ -138,36 +138,38 @@ def load_hex_file(filepath):
     return np.array(pixels, dtype=np.uint8).reshape((IMG_SIZE, IMG_SIZE))
 
 
-def crop_face_square(gray_frame, face_rect):
+def crop_face_rect(gray_frame, face_rect):
     """
-    Recorta o rosto expandindo para um quadrado centrado no retângulo detectado.
-    Isso evita distorção ao redimensionar para 32×32.
+    Recorta o rosto com padding de 15% — idêntico ao preprocessor.py do treinamento.
+    Usa crop retangular (não força quadrado).
     """
     h_img, w_img = gray_frame.shape
     x, y, w, h = face_rect
-
-    # Expande para quadrado usando o lado maior
-    side = max(w, h)
-
-    # Adiciona margem de 15% para incluir testa e queixo
-    margin = int(side * 0.15)
-    side = side + margin
-
-    # Centraliza o quadrado no centro do retângulo original
-    cx = x + w // 2
-    cy = y + h // 2
-    x1 = cx - side // 2
-    y1 = cy - side // 2
-    x2 = x1 + side
-    y2 = y1 + side
-
-    # Clamp às bordas da imagem
-    x1 = max(0, x1)
-    y1 = max(0, y1)
-    x2 = min(w_img, x2)
-    y2 = min(h_img, y2)
-
+    pad = int(w * 0.15)
+    y1, y2 = max(0, y - pad), min(h_img, y + h + pad)
+    x1, x2 = max(0, x - pad), min(w_img, x + w + pad)
     return gray_frame[y1:y2, x1:x2]
+
+
+def detect_face_adaptive(gray_frame, face_cascade):
+    """
+    Detecção adaptativa em cascata — idêntica ao preprocessor.py do treinamento.
+    Retorna (roi_cropped, face_rect) ou (None, None) se nenhum rosto encontrado.
+    """
+    detection_configs = [
+        (1.2, 5, 60),
+        (1.1, 3, 40),
+        (1.05, 2, 30),
+    ]
+    for sf, mn, ms in detection_configs:
+        faces = face_cascade.detectMultiScale(
+            gray_frame, scaleFactor=sf, minNeighbors=mn, minSize=(ms, ms)
+        )
+        if len(faces) > 0:
+            largest = max(faces, key=lambda f: f[2] * f[3])
+            roi = crop_face_rect(gray_frame, largest)
+            return roi, largest
+    return None, None
 
 
 def main():
@@ -211,21 +213,23 @@ def main():
             print(f"[OK] Arquivo hex '{args.file}' carregado ({frame.shape})")
         else:
             # Arquivo de imagem (PNG, JPG, BMP, etc.)
-            img = cv2.imread(args.file, cv2.IMREAD_GRAYSCALE)
-            if img is None:
+            img_bgr = cv2.imread(args.file)
+            if img_bgr is None:
                 print(f"[ERRO] Não foi possível ler {args.file}")
                 sys.exit(1)
 
-            out_frame = img
-            # Aplica Haarcascade no arquivo estático se habilitado
+            gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+
+            # CLAHE — idêntico ao preprocessor.py do treinamento
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+            gray = clahe.apply(gray)
+
+            out_frame = gray
             if face_cascade is not None:
-                faces = face_cascade.detectMultiScale(
-                    img, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30)
-                )
-                if len(faces) > 0:
-                    largest = max(faces, key=lambda f: f[2] * f[3])
-                    out_frame = crop_face_square(img, largest)
-                    print(f"[OK] Rosto detectado: {largest}")
+                roi, rect = detect_face_adaptive(gray, face_cascade)
+                if roi is not None:
+                    out_frame = roi
+                    print(f"[OK] Rosto detectado: {rect}")
                 else:
                     print("[AVISO] Nenhum rosto detectado, enviando imagem completa.")
 
@@ -274,19 +278,16 @@ def main():
     # Converte para grayscale
     gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
 
-    # Aplica CLAHE para normalização de iluminação
+    # CLAHE — idêntico ao preprocessor.py do treinamento
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
     gray = clahe.apply(gray)
 
     out_frame = gray
     if face_cascade is not None:
-        faces = face_cascade.detectMultiScale(
-            gray, scaleFactor=1.1, minNeighbors=5, minSize=(60, 60)
-        )
-        if len(faces) > 0:
-            largest = max(faces, key=lambda f: f[2] * f[3])
-            out_frame = crop_face_square(gray, largest)
-            print(f"[OK] Rosto detectado: {largest}")
+        roi, rect = detect_face_adaptive(gray, face_cascade)
+        if roi is not None:
+            out_frame = roi
+            print(f"[OK] Rosto detectado: {rect}")
         else:
             print("[AVISO] Nenhum rosto detectado, enviando frame completo.")
 

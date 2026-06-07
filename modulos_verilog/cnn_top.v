@@ -2,8 +2,14 @@
 // Módulo: cnn_top
 // Descrição: Top-level da arquitetura Tiny-CNN. Instancia, conecta e orquestra
 //            todos os submódulos da rede: Framebuffer, Line Buffer, Convolução,
-//            Max Pooling, Flatten, Camada Densa (18 classes) e Decisão
-//            (Argmax/Threshold com limiar de 95% configurável).
+//            Max Pooling, Flatten, Camada Densa (19 classes) e Decisão
+//            (Argmax puro — sem threshold, desconhecido = classe 0 nativa).
+//
+// Mapeamento de Classes (ordem Keras — string sort das pastas do dataset):
+//   0 = Desconhecido | 1 = Igor | 2 = Joao | 3 = Jose Henrique | 4 = Julia
+//   5 = Lucio | 6 = Naira | 7 = Rafael | 8 = Samuel | 9 = Yuri
+//   10 = Anna Carol | 11 = Bruno | 12 = Diego | 13 = Eduardo | 14 = Fabio
+//   15 = Felipe | 16 = Gabriel | 17 = Horacio | 18 = Hugo
 // ==============================================================================
 module cnn_top (
     input wire clk,
@@ -31,8 +37,8 @@ module cnn_top (
     output wire [7:0] vga_rd_data,
 
     output wire [15:0] final_result,
-    output wire [4:0]  class_id,       // 0-17 = classe; 18 = negado
-    output wire        unknown,
+    output wire [4:0]  class_id,       // 0 = Desconhecido; 1-18 = pessoa identificada
+    output wire        unknown,        // 1 quando class_id == 0 (rede prediz desconhecido)
     output reg         access_done,
     output wire        frame_ready,
     output wire        debug_weights_nonzero,
@@ -78,9 +84,9 @@ module cnn_top (
     wire flat_valid;
     wire signed [15:0] flat_data;
 
-    // Pesos e biases — 18 classes
-    wire signed [7:0] dense_w [0:17];
-    wire signed [7:0] dense_b [0:17];
+    // Pesos e biases — 19 classes
+    wire signed [7:0] dense_w [0:18];
+    wire signed [7:0] dense_b [0:18];
     localparam integer DENSE_ADDR_WIDTH = 14;
     reg [DENSE_ADDR_WIDTH-1:0] dense_addr;
 
@@ -96,7 +102,7 @@ module cnn_top (
 
     wire dense_done;
     wire dense_valid;
-    wire signed [15:0] dense_scores [0:17];
+    wire signed [15:0] dense_scores [0:18];
     wire argmax_valid;
 
     reg [10:0] rd_req_count;
@@ -119,7 +125,7 @@ module cnn_top (
                                     dense_b[ 4], dense_b[ 5], dense_b[ 6], dense_b[ 7],
                                     dense_b[ 8], dense_b[ 9], dense_b[10], dense_b[11],
                                     dense_b[12], dense_b[13], dense_b[14], dense_b[15],
-                                    dense_b[16], dense_b[17]};
+                                    dense_b[16], dense_b[17], dense_b[18]};
     assign debug_frame_nonzero = |debug_or_acc;
 
     // UART RX: converte serial em byte + pulso de dado valido
@@ -227,8 +233,8 @@ module cnn_top (
         .dense_b(dense_b)
     );
 
-    // 7. Camada Densa: Calcula os logits (scores brutos) para as 18 classes
-    dense_900x18_scores dense_inst (
+    // 7. Camada Densa: Calcula os logits (scores brutos) para as 19 classes
+    dense_900x19_scores dense_inst (
         .clk(clk),
         .rst(rst),
         .x_in(flat_data),
@@ -240,12 +246,10 @@ module cnn_top (
         .done(dense_done)
     );
 
-    // 8. Argmax + Threshold: Identifica a predição dominante com limiar de 95%
-    //    Para alterar o threshold, modifique o parâmetro THRESH_Q2_14:
-    //      95% → 15564 | 90% → 14746 | 80% → 13107 | 70% → 11469
-    argmax_threshold_18 #(
-        .THRESH_Q2_14(16'sd15564)
-    ) argmax_inst (
+    // 8. Argmax: Identifica a predição dominante entre as 19 classes.
+    //    SEM threshold — a classe 0 (Desconhecido) é nativa da rede (Softmax).
+    //    unknown = 1 apenas quando a rede prediz a classe 0.
+    argmax_19 argmax_inst (
         .clk(clk),
         .rst(rst),
         .valid_in(dense_valid),

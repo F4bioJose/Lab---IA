@@ -1,4 +1,4 @@
-# Arquitetura e Pipeline — Tiny-CNN FPGA (18 Classes)
+# Arquitetura e Pipeline — Tiny-CNN FPGA (19 Classes)
 
 Documentação técnica completa da implementação em hardware da CNN de classificação biométrica facial sintetizada na FPGA DE2-115 (Cyclone IV EP4CE115F29C7).
 
@@ -15,8 +15,8 @@ fpga_top_de2115.v          ← Top-level sintetizável (pinos físicos)
     ├── convolucao_mac.v    ← Convolução (4 filtros, ReLU)
     ├── max_pooling_design.v← Max Pooling 2×2
     ├── flatten.v           ← Serialização
-    ├── dense_900x18.v      ← Camada densa (18 classes)
-    ├── argmax_threshold_18.v← Decisão final
+    ├── dense_900x19.v      ← Camada densa (19 classes)
+    ├── argmax_19.v         ← Decisão final (argmax puro)
     └── weights_shared_rom.v← ROM de pesos (arquivo único)
 ```
 
@@ -74,27 +74,27 @@ UART_RXD (pino AB21 da DE2-115)
  │ Identidade — repassa dados e conta até 900
  │ Ao elemento 899: pulso done (1 ciclo)
  │
- ▼ dense_900x18.v   (dense_900x18_scores)
- │ 18 acumuladores paralelos em Q3.21 (48 bits cada)
+ ▼ dense_900x19.v   (dense_900x19_scores)
+ │ 19 acumuladores paralelos em Q3.21 (48 bits cada)
  │ A cada flat_valid: acc[i] += x_in × weight_rom[dense_addr][i]
  │ Após 900 entradas: acc[i] += bias[i] → shift_right 7 → Q2.14
  │ Saturação INT16 [-32768, +32767]
- │ Emite: scores[0..17][15:0] + valid_out + done
+ │ Emite: scores[0..18][15:0] + valid_out + done
  │
- ▼ argmax_threshold_18.v
- │ Combinacional: compara scores[0..17], extrai max_idx e max_val
- │ Threshold: THRESH_Q2_14 = 15564 (≈ 0.95 em Q2.14)
- │ Se max_val < threshold → class_id = 18, unknown = 1
- │ Senão                  → class_id = max_idx, unknown = 0
+ ▼ argmax_19.v
+ │ Combinacional: compara scores[0..18], extrai max_idx e max_val
+ │ Sem limiar estático — classe 0 é a classe de rejeição nativa (Desconhecido)
+ │ class_id = max_idx
+ │ unknown = 1 se max_idx == 0, senão 0
  │
  ▼ FSM cnn_top (ST_DONE)
  │ access_done = 1 (1 ciclo único)
  │
  ▼ fpga_top_de2115.v (registrador latch dos LEDs)
- │ LEDG[4:0] ← class_id   (0–17 = classe, 18 = negado)
+ │ LEDG[4:0] ← class_id   (0 = Desconhecido, 1–18 = membro)
  │ LEDG[5]   ← debug_frame_nonzero
  │ LEDG[6]   ← 1 (inferência concluída)
- │ LEDG[7]   ← unknown
+ │ LEDG[7]   ← unknown    (1 = classe 0 predita)
  ▼
 LEDs da DE2-115 (resultado mantido até reset ou nova imagem)
 ```
@@ -203,15 +203,15 @@ Identidade com contador de 900 elementos. Repassa `data_in → data_out` e pulsa
 
 ---
 
-### `dense_900x18.v` — Camada Densa (18 Classes)
+### `dense_900x19.v` — Camada Densa (19 Classes)
 
-Instância: `dense_900x18_scores`
+Instância: `dense_900x19_scores`
 
-18 acumuladores paralelos de 48 bits (Q3.21) — evitam overflow ao somar 900 produtos.
+19 acumuladores paralelos de 48 bits (Q3.21) — evitam overflow ao somar 900 produtos.
 
 A cada `flat_valid`:
 ```
-acc[i] += signed(x_in) × signed(weight_rom[dense_addr * 18 + i])
+acc[i] += signed(x_in) × signed(weight_rom[dense_addr * 19 + i])
 ```
 
 Ao `flat_done`:
@@ -219,27 +219,25 @@ Ao `flat_done`:
 score[i] = saturate((acc[i] + bias[i]) >>> 7, INT16)
 ```
 
-> Implementado **sem nenhum `for` loop** — todos os 18 acumuladores e 18 assigns de score são instâncias explícitas. Isso dá controle preciso ao sintetizador sobre o mapeamento lógico.
+> Implementado **sem nenhum `for` loop** — todos os 19 acumuladores e 19 assigns de score são instâncias explícitas. Isso dá controle preciso ao sintetizador sobre o mapeamento lógico.
 
-Emite `valid_out` e `done` simultâneos quando os 18 scores estão prontos.
+Emite `valid_out` e `done` simultâneos quando os 19 scores estão prontos.
 
 ---
 
-### `argmax_threshold_18.v` — Decisão Final
+### `argmax_19.v` — Decisão Final
 
-Puramente combinacional. Compara os 18 scores e extrai o máximo por árvore de comparadores explícita (sem `for`).
+Puramente combinacional. Compara os 19 scores e extrai o máximo por árvore de comparadores explícita (sem `for`).
 
-Threshold:
-```
-THRESH_Q2_14 = 15564   // int(0.95 × 16384) = 15564
-```
+**Lógica da Classe de Rejeição (Desconhecido)**:
+Em vez de um limiar estático, a rede foi treinada com a classe 0 como classe explícita para "Desconhecido".
 
 Saídas:
-- `class_id[4:0]`: 0–17 se score ≥ threshold, **18** se abaixo (negado)
-- `unknown`: 1 quando score < threshold
-- `final_result[15:0]`: valor do score máximo
+- `class_id[4:0]`: `max_idx` (0 para desconhecido, 1–18 para membro)
+- `unknown`: 1 quando `class_id == 0`, senão 0
+- `final_result[15:0]`: valor numérico do score máximo
 
-O threshold é parametrizável (padrão 95%) e facilmente alterável sem modificar a lógica.
+Isso elimina a necessidade de fine-tuning manual de um limiar, transferindo a responsabilidade de incerteza para a rede neural.
 
 ---
 
@@ -247,16 +245,16 @@ O threshold é parametrizável (padrão 95%) e facilmente alterável sem modific
 
 Array `mem[0:TOTAL_WORDS-1]` de 8 bits inicializado via `$readmemh("weights_all.hex")`.
 
-Layout para 18 classes (16.258 bytes total):
+Layout para 19 classes (17.159 bytes total):
 
 | Faixa | Conteúdo | Tamanho |
 |-------|----------|---------|
 | `[0..35]` | Pesos conv (4 filtros × 9 coefs) | 36 bytes |
 | `[36..39]` | Biases conv | 4 bytes |
-| `[40..16239]` | Pesos densos (900 × 18 classes, por classe) | 16.200 bytes |
-| `[16240..16257]` | Biases densos (18) | 18 bytes |
+| `[40..17139]` | Pesos densos (900 × 19 classes) | 17.100 bytes |
+| `[17140..17158]` | Biases densos (19) | 19 bytes |
 
-Os pesos convolucionais são extraídos por `assign` estático (endereços fixos). Os pesos densos são acessados por `dense_addr` (0..899) em runtime, com 18 assigns simultâneos por endereço.
+Os pesos convolucionais são extraídos por `assign` estático (endereços fixos). Os pesos densos são acessados por `dense_addr` (0..899) em runtime, com 19 assigns simultâneos por endereço.
 
 > Para síntese no Quartus, o bloco `initial $readmemh` dentro de `ifdef SIMULATION` é ignorado e o arquivo `.mif` inicializa os M9K automaticamente via atributo Altera.
 
@@ -277,7 +275,7 @@ Sinais-chave do barramento interno:
 | `fb_rd_en` | registrado (FSM) | Habilita leitura do framebuffer |
 | `fb_rd_addr[9:0]` | registrado (FSM) | Endereço de leitura |
 | `dense_addr[9:0]` | registrado | Endereço dos pesos densos (0..899) |
-| `dense_scores[17:0][15:0]` | wire | 18 scores da camada densa |
+| `dense_scores[18:0][15:0]` | wire | 19 scores da camada densa |
 | `access_done` | registrado (FSM) | Pulso 1 ciclo = resultado pronto |
 
 ---

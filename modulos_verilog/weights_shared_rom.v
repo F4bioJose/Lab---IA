@@ -4,29 +4,35 @@
 //            e os vieses treinados a partir de um único arquivo .hex.
 //            Fornece acesso de leitura para o pipeline da CNN.
 //
-// *** CONFIGURAÇÃO DE CLASSES ***
-// Altere DENSE_CLASSES conforme o modelo em uso:
-//   DENSE_CLASSES = 7  → weights_all.hex gerado do .mif de 7 classes (atual)
-//   DENSE_CLASSES = 18 → weights_all.hex gerado do .mif de 18 classes (futuro)
+// *** CONFIGURAÇÃO ATUAL: 19 CLASSES ***
+// Mapeamento de classes (ordem Keras — string sort das pastas do dataset):
+//   0  = Desconhecido (classe nativa da rede)
+//   1  = Igor         | 2  = Joao        | 3  = Jose Henrique
+//   4  = Julia        | 5  = Lucio       | 6  = Naira
+//   7  = Rafael       | 8  = Samuel      | 9  = Yuri
+//   10 = Anna Carol   | 11 = Bruno       | 12 = Diego
+//   13 = Eduardo      | 14 = Fabio       | 15 = Felipe
+//   16 = Gabriel      | 17 = Horacio     | 18 = Hugo
 //
-// Estrutura do arquivo de pesos:
-//   [0   .. 35]                         → pesos conv (4 filtros × 9 coefs)
-//   [36  .. 39]                         → biases conv (4)
-//   [40  .. 40 + DENSE_SIZE*N - 1]     → pesos densos (DENSE_SIZE × N classes)
-//   [40 + DENSE_SIZE*N .. +N-1]        → biases densos (N)
+// Estrutura do arquivo de pesos (tiny_cnn_multiclasse.h5 → all_weights.mif):
+//   [0   .. 35]                          → pesos conv (4 filtros × 9 coefs = 36)
+//   [36  .. 39]                          → biases conv (4)
+//   [40  .. 40 + DENSE_SIZE*19 - 1]     → pesos densos (900 × 19 = 17100)
+//   [17140 .. 17158]                     → biases densos (19)
+//   Total = 36 + 4 + 17100 + 19 = 17159  ✓ (bate com DEPTH do .mif)
 // ==============================================================================
 module weights_shared_rom #(
     parameter MEM_FILE      = "modulos_verilog/weights_all.hex",
     parameter integer CONV_FILTERS  = 4,
     parameter integer CONV_KERNEL   = 9,
     parameter integer DENSE_SIZE    = 900,
-    // *** ALTERE AQUI PARA 7 (validação) OU 18 (produção) ***
-    parameter integer DENSE_CLASSES = 18,
+    // 19 classes: 0=Desconhecido, 1..18=pessoas identificadas
+    parameter integer DENSE_CLASSES = 19,
     parameter integer OFF_CONV_W     = 0,                                 // 0
     parameter integer OFF_CONV_B     = CONV_FILTERS * CONV_KERNEL,        // 36
     parameter integer OFF_DENSE_W    = OFF_CONV_B + CONV_FILTERS,         // 40
-    parameter integer OFF_DENSE_B    = OFF_DENSE_W + DENSE_SIZE * DENSE_CLASSES, // 16240
-    parameter integer TOTAL_WORDS    = OFF_DENSE_B + DENSE_CLASSES        // 16258
+    parameter integer OFF_DENSE_B    = OFF_DENSE_W + DENSE_SIZE * DENSE_CLASSES, // 17140
+    parameter integer TOTAL_WORDS    = OFF_DENSE_B + DENSE_CLASSES        // 17159
 )(
     input  wire [13:0]              dense_addr,     // Endereço de 0 a 899 (entrada do flatten)
     // Pesos e biases da camada convolucional
@@ -38,7 +44,7 @@ module weights_shared_rom #(
     output wire signed [7:0]        conv_b1,
     output wire signed [7:0]        conv_b2,
     output wire signed [7:0]        conv_b3,
-    // Pesos e biases da camada densa (18 classes)
+    // Pesos e biases da camada densa (19 classes)
     output wire signed [7:0]        dense_w [0:DENSE_CLASSES-1],
     output wire signed [7:0]        dense_b [0:DENSE_CLASSES-1]
 );
@@ -108,6 +114,7 @@ module weights_shared_rom #(
     // -------------------------------------------------------------------------
     // Mapeamento dinâmico dos pesos densos — indexado por dense_addr (0..899)
     // Cada classe c ocupa mem[OFF_DENSE_W + c*900 .. OFF_DENSE_W + c*900 + 899]
+    // Classe 0 = Desconhecido; Classes 1..18 = pessoas identificadas
     // -------------------------------------------------------------------------
     assign dense_w[ 0] = mem[OFF_DENSE_W +  0 * DENSE_SIZE + dense_addr];
     assign dense_w[ 1] = mem[OFF_DENSE_W +  1 * DENSE_SIZE + dense_addr];
@@ -127,9 +134,10 @@ module weights_shared_rom #(
     assign dense_w[15] = mem[OFF_DENSE_W + 15 * DENSE_SIZE + dense_addr];
     assign dense_w[16] = mem[OFF_DENSE_W + 16 * DENSE_SIZE + dense_addr];
     assign dense_w[17] = mem[OFF_DENSE_W + 17 * DENSE_SIZE + dense_addr];
+    assign dense_w[18] = mem[OFF_DENSE_W + 18 * DENSE_SIZE + dense_addr];
 
     // -------------------------------------------------------------------------
-    // Mapeamento estático dos biases densos (18 bytes, endereços fixos)
+    // Mapeamento estático dos biases densos (19 bytes, endereços fixos)
     // -------------------------------------------------------------------------
     assign dense_b[ 0] = mem[OFF_DENSE_B +  0];
     assign dense_b[ 1] = mem[OFF_DENSE_B +  1];
@@ -149,5 +157,6 @@ module weights_shared_rom #(
     assign dense_b[15] = mem[OFF_DENSE_B + 15];
     assign dense_b[16] = mem[OFF_DENSE_B + 16];
     assign dense_b[17] = mem[OFF_DENSE_B + 17];
+    assign dense_b[18] = mem[OFF_DENSE_B + 18];
 
 endmodule

@@ -2,22 +2,28 @@
 
 // ==============================================================================
 // Módulo: tb_cnn_layer_capture
-// Descrição: Testbench de simulação do cnn_top (18 classes).
+// Descrição: Testbench de simulação do cnn_top (19 classes).
 //            Para cada imagem processada, captura a saída de cada camada da
 //            CNN em um arquivo .txt separado, permitindo comparação ponto a
 //            ponto com a implementação Python de referência.
+//
+// Mapeamento de Classes (ordem Keras — string sort das pastas do dataset):
+//   0 = Desconhecido | 1 = Igor | 2 = Joao | 3 = Jose Henrique
+//   4 = Julia | 5 = Lucio | 6 = Naira | 7 = Rafael
+//   8 = Samuel | 9 = Yuri | 10 = Anna Carol | 11 = Bruno | 12 = Diego
+//   13 = Eduardo | 14 = Fabio | 15 = Felipe | 16 = Gabriel | 17 = Horacio | 18 = Hugo
 //
 // Arquivos gerados (por padrão em "comparacao/hw/"):
 //   conv_out.txt   — Saídas dos 4 filtros conv após ReLU (uma linha por janela)
 //   pool_out.txt   — Saídas do Max Pooling serializadas (uma linha por amostra)
 //   flat_out.txt   — Saídas do Flatten (uma linha por elemento, 900 total)
-//   dense_out.txt  — Scores finais das 18 classes (uma linha com 18 valores)
+//   dense_out.txt  — Scores finais das 19 classes (uma linha com 19 valores)
 //
 // Formato de cada linha:
 //   conv_out.txt : "f0 f1 f2 f3\n"          (4 valores Q2.14 com sinal)
 //   pool_out.txt : "val\n"                   (1 valor Q2.14 por canal serializado)
 //   flat_out.txt : "val\n"                   (1 valor Q2.14)
-//   dense_out.txt: "s0 s1 ... s17\n"         (18 scores Q2.14 com sinal)
+//   dense_out.txt: "s0 s1 ... s18\n"         (19 scores Q2.14 com sinal)
 //
 // Uso no ModelSim/Questa:
 //   vsim tb_cnn_layer_capture +IMG=inputs/teste2.txt +OUTDIR=comparacao/hw/
@@ -148,11 +154,11 @@ module tb_cnn_layer_capture;
     end
 
     // =========================================================================
-    // CAPTURA — Dense: salva os 18 scores em uma única linha ao final
+    // CAPTURA — Dense: salva os 19 scores em uma única linha ao final
     // =========================================================================
     always @(posedge clk) begin
         if (dut.dense_valid) begin
-            $fwrite(fd_dense, "%0d %0d %0d %0d %0d %0d %0d %0d %0d %0d %0d %0d %0d %0d %0d %0d %0d %0d\n",
+            $fwrite(fd_dense, "%0d %0d %0d %0d %0d %0d %0d %0d %0d %0d %0d %0d %0d %0d %0d %0d %0d %0d %0d\n",
                 $signed(dut.dense_scores[ 0]),
                 $signed(dut.dense_scores[ 1]),
                 $signed(dut.dense_scores[ 2]),
@@ -170,7 +176,8 @@ module tb_cnn_layer_capture;
                 $signed(dut.dense_scores[14]),
                 $signed(dut.dense_scores[15]),
                 $signed(dut.dense_scores[16]),
-                $signed(dut.dense_scores[17]));
+                $signed(dut.dense_scores[17]),
+                $signed(dut.dense_scores[18]));
         end
     end
 
@@ -213,7 +220,7 @@ module tb_cnn_layer_capture;
         $fwrite(fd_conv,  "# Layer: conv | Image: %s | Format: f0 f1 f2 f3 (Q2.14 signed)\n", img_file);
         $fwrite(fd_pool,  "# Layer: pool | Image: %s | Format: val (Q2.14 signed)\n",          img_file);
         $fwrite(fd_flat,  "# Layer: flat | Image: %s | Format: val (Q2.14 signed)\n",           img_file);
-        $fwrite(fd_dense, "# Layer: dense | Image: %s | Format: s0..s17 (Q2.14 signed)\n",     img_file);
+        $fwrite(fd_dense, "# Layer: dense | Image: %s | Format: s0..s18 (Q2.14 signed) | Classe 0=Desconhecido, 1..18=Pessoas\n", img_file);
 
         // -- Carrega imagem --
         $readmemh(img_file, img_mem);
@@ -252,23 +259,36 @@ module tb_cnn_layer_capture;
         // =====================================================================
         $display("[TB] ===== INFERÊNCIA CONCLUÍDA =====");
         $display("[TB] class_id   = %0d", class_id);
-        $display("[TB] unknown    = %0b (threshold: %0b)", unknown, unknown);
+        $display("[TB] unknown    = %0b (classe 0 = Desconhecido nativo)", unknown);
         $display("[TB] max_score  = %0d (Q2.14 = %f)", $signed(final_result),
                  $signed(final_result) / 16384.0);
 
         $display("[TB] Dense scores (Q2.14 → float):");
-        $display("[TB]   s[ 0]=%0d  s[ 1]=%0d  s[ 2]=%0d  s[ 3]=%0d  s[ 4]=%0d  s[ 5]=%0d",
-            $signed(dut.dense_scores[ 0]), $signed(dut.dense_scores[ 1]),
-            $signed(dut.dense_scores[ 2]), $signed(dut.dense_scores[ 3]),
-            $signed(dut.dense_scores[ 4]), $signed(dut.dense_scores[ 5]));
-        $display("[TB]   s[ 6]=%0d  s[ 7]=%0d  s[ 8]=%0d  s[ 9]=%0d  s[10]=%0d  s[11]=%0d",
-            $signed(dut.dense_scores[ 6]), $signed(dut.dense_scores[ 7]),
-            $signed(dut.dense_scores[ 8]), $signed(dut.dense_scores[ 9]),
-            $signed(dut.dense_scores[10]), $signed(dut.dense_scores[11]));
-        $display("[TB]   s[12]=%0d  s[13]=%0d  s[14]=%0d  s[15]=%0d  s[16]=%0d  s[17]=%0d",
-            $signed(dut.dense_scores[12]), $signed(dut.dense_scores[13]),
-            $signed(dut.dense_scores[14]), $signed(dut.dense_scores[15]),
-            $signed(dut.dense_scores[16]), $signed(dut.dense_scores[17]));
+        $display("[TB]   s[ 0]=%-6d [Desconhecido]",    $signed(dut.dense_scores[ 0]));
+        $display("[TB]   s[ 1]=%-6d  s[ 2]=%-6d  s[ 3]=%-6d",
+            $signed(dut.dense_scores[ 1]),
+            $signed(dut.dense_scores[ 2]),
+            $signed(dut.dense_scores[ 3]));
+        $display("[TB]   s[ 4]=%-6d  s[ 5]=%-6d  s[ 6]=%-6d",
+            $signed(dut.dense_scores[ 4]),
+            $signed(dut.dense_scores[ 5]),
+            $signed(dut.dense_scores[ 6]));
+        $display("[TB]   s[ 7]=%-6d  s[ 8]=%-6d  s[ 9]=%-6d",
+            $signed(dut.dense_scores[ 7]),
+            $signed(dut.dense_scores[ 8]),
+            $signed(dut.dense_scores[ 9]));
+        $display("[TB]   s[10]=%-6d  s[11]=%-6d  s[12]=%-6d",
+            $signed(dut.dense_scores[10]),
+            $signed(dut.dense_scores[11]),
+            $signed(dut.dense_scores[12]));
+        $display("[TB]   s[13]=%-6d  s[14]=%-6d  s[15]=%-6d",
+            $signed(dut.dense_scores[13]),
+            $signed(dut.dense_scores[14]),
+            $signed(dut.dense_scores[15]));
+        $display("[TB]   s[16]=%-6d  s[17]=%-6d  s[18]=%-6d",
+            $signed(dut.dense_scores[16]),
+            $signed(dut.dense_scores[17]),
+            $signed(dut.dense_scores[18]));
 
         // -- Fecha arquivos de captura --
         $fclose(fd_conv);

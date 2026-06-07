@@ -1,31 +1,47 @@
 // ==============================================================================
-// Módulo: argmax_threshold_18
-// Descrição: Recebe os scores das 18 classes produzidos pela camada densa,
+// Módulo: argmax_19
+// Descrição: Recebe os scores das 19 classes produzidos pela camada densa,
 //            encontra o índice (classe) com a maior pontuação (argmax) e
-//            aplica um limiar de confiança (threshold) configurável.
+//            sinaliza "desconhecido" caso a classe vencedora seja a classe 0.
 //
-// Threshold:
-//   - Expresso em formato ponto fixo Q2.14
-//   - Padrão: 95% de confiança → 0.95 × 2^14 = 15564 (decimal) = 0x3CAC
-//   - Altere o parâmetro THRESH_Q2_14 para mudar o limiar sem recompilar
+// Mapeamento de Classes:
+//   0  → Desconhecido (classe nativa da rede, treinada com Softmax)
+//   1  → Anna Carol
+//   2  → Bruno
+//   3  → Diego
+//   4  → Eduardo
+//   5  → Fabio
+//   6  → Felipe
+//   7  → Gabriel
+//   8  → Horacio
+//   9  → Hugo
+//   10 → Igor
+//   11 → Joao
+//   12 → Jose Henrique
+//   13 → Julia
+//   14 → Lucio
+//   15 → Naira
+//   16 → Rafael
+//   17 → Samuel
+//   18 → Yuri
+//
+// Lógica de Decisão:
+//   - NÃO há threshold de confiança — a decisão é exclusivamente pelo argmax
+//   - Se max_idx == 0  → unknown = 1 (pessoa não reconhecida)
+//   - Se max_idx != 0  → unknown = 0, class_id = max_idx
 //
 // Saídas:
-//   - class_id [4:0]: 0–17 = classe identificada; 18 = negado (abaixo do limiar)
-//   - unknown: 1 quando a predição não atingiu o threshold
+//   - class_id [4:0]: 0–18 = classe identificada (0 = desconhecido)
+//   - unknown: 1 quando a rede prediz a classe "Desconhecido" (índice 0)
 //   - max_score: valor Q2.14 do maior score encontrado
 // ==============================================================================
-module argmax_threshold_18 #(
-    // Threshold de aceitação em Q2.14 (default = 95%)
-    // Para alterar: 0.95 × 16384 = 15564
-    // Exemplos: 90% → 14746 | 80% → 13107 | 70% → 11469
-    parameter signed [15:0] THRESH_Q2_14 = 16'sd15564
-)(
+module argmax_19 (
     input  wire        clk,
     input  wire        rst,
     input  wire        valid_in,
-    input  wire signed [15:0] scores [0:17],
+    input  wire signed [15:0] scores [0:18],
     output reg         valid_out,
-    output reg  [4:0]  class_id,   // 0-17 = classe válida; 18 = negado
+    output reg  [4:0]  class_id,   // 0 = Desconhecido; 1..18 = pessoa identificada
     output reg         unknown,
     output reg  signed [15:0] max_score
 );
@@ -34,8 +50,8 @@ module argmax_threshold_18 #(
     reg [4:0]         max_idx;
 
     // -------------------------------------------------------------------------
-    // Busca do argmax: comparação em cascata explícita (sem for loops)
-    // A cada pulso valid_in os 18 scores são comparados em paralelo/sequência.
+    // Busca do argmax: comparação em cascata explícita das 19 classes.
+    // A cada pulso valid_in os 19 scores são comparados em paralelo/sequência.
     // -------------------------------------------------------------------------
     always @(posedge clk or posedge rst) begin
         if (rst) begin
@@ -51,7 +67,7 @@ module argmax_threshold_18 #(
                 max_val = scores[0];
                 max_idx = 5'd0;
 
-                // Comparações explícitas, classe a classe
+                // Comparações explícitas, classe a classe (1..18)
                 if (scores[ 1] > max_val) begin max_val = scores[ 1]; max_idx = 5'd1;  end
                 if (scores[ 2] > max_val) begin max_val = scores[ 2]; max_idx = 5'd2;  end
                 if (scores[ 3] > max_val) begin max_val = scores[ 3]; max_idx = 5'd3;  end
@@ -69,17 +85,14 @@ module argmax_threshold_18 #(
                 if (scores[15] > max_val) begin max_val = scores[15]; max_idx = 5'd15; end
                 if (scores[16] > max_val) begin max_val = scores[16]; max_idx = 5'd16; end
                 if (scores[17] > max_val) begin max_val = scores[17]; max_idx = 5'd17; end
+                if (scores[18] > max_val) begin max_val = scores[18]; max_idx = 5'd18; end
 
                 max_score <= max_val;
+                class_id  <= max_idx;
 
-                // Aplica threshold: se o maior score não atingiu o limiar, rejeita
-                if (max_val < THRESH_Q2_14) begin
-                    class_id  <= 5'd18;  // Código reservado: classe "negada"
-                    unknown   <= 1'b1;
-                end else begin
-                    class_id  <= max_idx;
-                    unknown   <= 1'b0;
-                end
+                // Desconhecido: a rede nativa treinou a classe 0 como "Desconhecido"
+                // Não há threshold — a decisão é puramente pelo argmax
+                unknown <= (max_idx == 5'd0) ? 1'b1 : 1'b0;
 
                 valid_out <= 1'b1;
             end

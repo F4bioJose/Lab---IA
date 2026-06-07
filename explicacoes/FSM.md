@@ -1,4 +1,4 @@
-# Máquinas de Estados Finitas (FSMs) — Tiny-CNN FPGA (18 Classes)
+# Máquinas de Estados Finitas (FSMs) — Tiny-CNN FPGA (19 Classes)
 
 Este documento detalha o funcionamento das duas Máquinas de Estados Finitas que governam o fluxo de inferência da arquitetura Tiny-CNN implementada na FPGA DE2-115. O sistema é composto por dois módulos hierárquicos, cada qual com sua própria lógica de controle:
 
@@ -77,11 +77,11 @@ Portanto, a inferência é disparada automaticamente assim que os 1024 bytes da 
 
 **Ações do Estado:**
 - Mantém o barramento de leitura desabilitado (`fb_rd_en = 0`).
-- Monitora passivamente o sinal `dense_done`, que será emitido pela camada densa quando o último dos 900 elementos achatados for processado e os **18 scores de classe** estiverem calculados.
+- Monitora passivamente o sinal `dense_done`, que será emitido pela camada densa quando o último dos 900 elementos achatados for processado e os **19 scores de classe** estiverem calculados.
 - Durante este período, o endereço `dense_addr` é incrementado automaticamente a cada pulso de `flat_valid` (controlado fora da FSM, na lógica combinacional do `cnn_top`), percorrendo os 900 endereços da ROM de pesos densos.
 
 **Condição de Transição (`ST_WAIT` ➔ `ST_DONE`):**
-- Ocorre quando `dense_done == 1`. Neste instante, os 18 scores brutos (logits) estão estáveis nas saídas da camada densa, e o módulo Argmax/Threshold já computou `class_id`, `unknown` e `max_score`.
+- Ocorre quando `dense_done == 1`. Neste instante, os 19 scores brutos (logits) estão estáveis nas saídas da camada densa, e o módulo Argmax já computou `class_id`, `unknown` e `max_score`.
 
 ---
 
@@ -91,8 +91,8 @@ Portanto, a inferência é disparada automaticamente assim que os 1024 bytes da 
 **Ações do Estado:**
 - Ativa o sinal `access_done = 1` por um único ciclo.
 - Neste exato ciclo, as seguintes portas de saída do `cnn_top` contêm valores válidos e podem ser capturados:
-  - `class_id[4:0]`: índice da classe predita (0–17 para membros, **18** para negado/desconhecido).
-  - `unknown`: flag booleano indicando se o score máximo ficou abaixo do limiar de confiança (95%).
+  - `class_id[4:0]`: índice da classe predita (0 = Desconhecido, 1–18 para membros).
+  - `unknown`: flag booleano indicando se `class_id` é 0 (classe de rejeição).
   - `final_result[15:0]`: valor numérico do maior score em formato Q2.14.
 
 **Condição de Transição (`ST_DONE` ➔ `ST_IDLE`):**
@@ -122,10 +122,10 @@ stateDiagram-v2
 
 | LED | Sinal Latched | Significado |
 |-----|---------------|-------------|
-| `LEDG[4:0]` | `class_id[4:0]` | Classe predita em binário (0–17 = membro; 18 = negado) |
+| `LEDG[4:0]` | `class_id[4:0]` | Classe predita em binário (0 = Desconhecido; 1–18 = membro) |
 | `LEDG[5]` | `debug_frame_nonzero` | Frame recebido com pixels não-nulos |
 | `LEDG[6]` | `1` quando concluído | Inferência concluída com sucesso |
-| `LEDG[7]` | `unknown` | Score máximo abaixo do limiar de 95% |
+| `LEDG[7]` | `unknown` | Predição foi a classe 0 (Desconhecido) |
 
 **Comportamento detalhado:**
 - **Ao reset (`KEY[0]` pressionado):** Todos os LEDs são apagados (`LEDG = 8'b00000000`).
