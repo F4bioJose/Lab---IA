@@ -37,13 +37,11 @@ module framebuffer_32x32 (
 
     // Utiliza duas memórias espelhadas (mem_a e mem_b) para permitir duas 
     // leituras assíncronas simultâneas sem instanciar uma RAM de 3 portas complexa.
-    reg [7:0] mem_a [0:1023];
-    reg [7:0] mem_b [0:1023];
+    (* ramstyle = "no_rw_check, M9K" *) reg [7:0] mem_a [0:1023];
+    (* ramstyle = "no_rw_check, M9K" *) reg [7:0] mem_b [0:1023];
 
     always @(posedge clk or posedge rst) begin
         if (rst) begin
-            rd_data <= 8'd0;
-            vga_rd_data <= 8'd0;
             frame_ready <= 1'b0;
         end else begin
             if (frame_clear) begin

@@ -37,7 +37,12 @@ def gerar_paredes_sinteticas(interim_dir, quantidade=300):
 
 def preprocess_unknown(proporcao_classe_0=2.0, num_fundos=300):
     # 1. Configuração de Alvos e Detectores
-    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+    cascade_name = 'haarcascade_frontalface_default.xml'
+    if hasattr(cv2, 'data'):
+        cascade_path = cv2.data.haarcascades + cascade_name
+    else:
+        cascade_path = '/usr/share/opencv4/haarcascades/' + cascade_name
+    face_cascade = cv2.CascadeClassifier(cascade_path)
     total_autorizados = contar_autorizados()
 
     if total_autorizados == 0:

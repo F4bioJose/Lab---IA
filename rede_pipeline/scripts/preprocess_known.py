@@ -34,7 +34,12 @@ def aplicar_augmentation(imagem):
 
 
 def processar_dados_autorizados(frames_pular=1, max_fotos_por_pessoa=400):
-    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+    cascade_name = 'haarcascade_frontalface_default.xml'
+    if hasattr(cv2, 'data'):
+        cascade_path = cv2.data.haarcascades + cascade_name
+    else:
+        cascade_path = '/usr/share/opencv4/haarcascades/' + cascade_name
+    face_cascade = cv2.CascadeClassifier(cascade_path)
 
     # SANITIZAÇÃO DOS NOMES NA PASTA RAW ---
     itens_raw_iniciais = list(cfg.RAW_AUTORIZADO_DIR.iterdir())

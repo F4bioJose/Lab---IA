@@ -84,6 +84,10 @@ module cnn_top (
     wire flat_valid;
     wire signed [15:0] flat_data;
 
+    // Atraso de 1 ciclo para sincronizar com a latência da ROM Densa M9K
+    reg flat_valid_d;
+    reg signed [15:0] flat_data_d;
+
     // Pesos e biases — 19 classes
     wire signed [7:0] dense_w [0:18];
     wire signed [7:0] dense_b [0:18];
@@ -103,6 +107,7 @@ module cnn_top (
     wire dense_done;
     wire dense_valid;
     wire signed [15:0] dense_scores [0:18];
+    wire weights_boot_done;
     wire argmax_valid;
 
     reg [10:0] rd_req_count;
@@ -220,6 +225,9 @@ module cnn_top (
 
     // 6. Memória ROM Compartilhada: Pesos pré-treinados (18 classes)
     weights_shared_rom weights_inst (
+        .clk(clk),
+        .rst(rst),
+        .boot_done(weights_boot_done),
         .dense_addr(dense_addr),
         .conv_w0(conv_w0),
         .conv_w1(conv_w1),
@@ -237,10 +245,10 @@ module cnn_top (
     dense_900x19_scores dense_inst (
         .clk(clk),
         .rst(rst),
-        .x_in(flat_data),
+        .x_in(flat_data_d),
         .w_in(dense_w),
         .bias_in(dense_b),
-        .valid_in(flat_valid),
+        .valid_in(flat_valid_d),
         .scores(dense_scores),
         .valid_out(dense_valid),
         .done(dense_done)
@@ -277,9 +285,14 @@ module cnn_top (
             debug_or_acc    <= 8'd0;
             access_done     <= 1'b0;
             frame_clear     <= 1'b0;
+            flat_valid_d    <= 1'b0;
+            flat_data_d     <= 16'sd0;
         end else begin
             rx_sync_1 <= rx_pin;
             rx_sync_2 <= rx_sync_1;
+
+            flat_valid_d <= flat_valid;
+            flat_data_d  <= flat_data;
 
             uart_start_pulse <= 1'b0;
             access_done      <= 1'b0;
@@ -325,7 +338,7 @@ module cnn_top (
                     fb_rd_addr   <= 10'd0;
                     rd_req_count <= 11'd0;
                     rd_val_count <= 11'd0;
-                    if (start_system_int && frame_ready) begin
+                    if (start_system_int && frame_ready && weights_boot_done) begin
                         state       <= ST_READ;
                         frame_clear <= 1'b1;
                         dense_addr  <= 14'd0;

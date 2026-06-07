@@ -36,10 +36,10 @@ if {[info exists 2] && $2 ne ""} {
 set hex_file "modulos_verilog/weights_all.hex"
 
 if {![file exists $img_file]} {
-    error "[ERRO] Imagem não encontrada: $img_file\nUso: do scripts/run_project.do inputs/sua_imagem.txt"
+    error "ERRO: Imagem não encontrada: $img_file\nUso: do scripts/run_project.do inputs/sua_imagem.txt"
 }
 if {![file exists $hex_file]} {
-    error "[ERRO] Pesos não encontrados: $hex_file\nGere com: python -c \"import sys; sys.path.insert(0,'rede_pipeline'); from src.export_mif import MIFExporter; ...\""
+    error "ERRO: Pesos não encontrados: $hex_file\nGere rodando o script python de exportação correspondente."
 }
 
 file mkdir $out_dir

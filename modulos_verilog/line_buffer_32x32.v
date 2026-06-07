@@ -16,8 +16,8 @@ module line_buffer_32x32 (
 
     // Memórias para o histórico das duas últimas linhas. Essenciais para 
     // recriar as 3 linhas simultâneas (junto ao pixel de entrada)
-    reg [7:0] row1 [0:31];
-    reg [7:0] row2 [0:31];
+    (* ramstyle = "no_rw_check, M9K" *) reg [7:0] row1 [0:31];
+    (* ramstyle = "no_rw_check, M9K" *) reg [7:0] row2 [0:31];
     
     // Contadores de posição X e Y na imagem
     reg [5:0] in_x;
@@ -28,13 +28,6 @@ module line_buffer_32x32 (
             in_x <= 6'd0;
             in_y <= 6'd0;
             window_valid <= 1'b0;
-            for (integer i = 0; i < 32; i = i + 1) begin
-                row1[i] <= 8'd0;
-                row2[i] <= 8'd0;
-            end
-            for (integer i = 0; i < 9; i = i + 1) begin
-                win[i] <= 8'd0;
-            end
         end else begin
             window_valid <= 1'b0;
 

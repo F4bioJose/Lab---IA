@@ -16,10 +16,10 @@ module max_pooling_design (
     output reg signed [15:0] data_out
 );
 
-    reg signed [15:0] row1_f0 [0:29];
-    reg signed [15:0] row1_f1 [0:29];
-    reg signed [15:0] row1_f2 [0:29];
-    reg signed [15:0] row1_f3 [0:29];
+    (* ramstyle = "no_rw_check, M9K" *) reg signed [15:0] row1_f0 [0:29];
+    (* ramstyle = "no_rw_check, M9K" *) reg signed [15:0] row1_f1 [0:29];
+    (* ramstyle = "no_rw_check, M9K" *) reg signed [15:0] row1_f2 [0:29];
+    (* ramstyle = "no_rw_check, M9K" *) reg signed [15:0] row1_f3 [0:29];
 
     reg signed [15:0] prev_row_prev_f0;
     reg signed [15:0] prev_row_prev_f1;
@@ -34,7 +34,7 @@ module max_pooling_design (
     reg [5:0] y;
 
     // Filas FIFO e Buffer (Agrupa e gerencia as saídas multiplexadas dos 4 canais)
-    reg [63:0] fifo [0:31];
+    (* ramstyle = "no_rw_check" *) reg [63:0] fifo [0:31];
     reg [4:0] wr_ptr;
     reg [4:0] rd_ptr;
     reg [5:0] fifo_count;
@@ -85,12 +85,6 @@ module max_pooling_design (
             pending <= 1'b0;
             valid_out <= 1'b0;
             data_out <= 16'sd0;
-            for (integer i = 0; i < 30; i = i + 1) begin
-                row1_f0[i] <= 16'sd0;
-                row1_f1[i] <= 16'sd0;
-                row1_f2[i] <= 16'sd0;
-                row1_f3[i] <= 16'sd0;
-            end
         end else begin
             valid_out <= 1'b0;
 

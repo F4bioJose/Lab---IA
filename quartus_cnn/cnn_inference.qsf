@@ -98,8 +98,8 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../modulos_verilog/line_buffer_32
 set_global_assignment -name SYSTEMVERILOG_FILE ../modulos_verilog/convolucao_mac.v
 set_global_assignment -name SYSTEMVERILOG_FILE ../modulos_verilog/max_pooling_design.v
 set_global_assignment -name SYSTEMVERILOG_FILE ../modulos_verilog/flatten.v
-set_global_assignment -name SYSTEMVERILOG_FILE ../modulos_verilog/dense_900x7.v
-set_global_assignment -name SYSTEMVERILOG_FILE ../modulos_verilog/argmax_threshold_7.v
+set_global_assignment -name SYSTEMVERILOG_FILE ../modulos_verilog/dense_900x19.v
+set_global_assignment -name SYSTEMVERILOG_FILE ../modulos_verilog/argmax_19.v
 set_global_assignment -name SYSTEMVERILOG_FILE ../modulos_verilog/weights_shared_rom.v
 set_global_assignment -name MIF_FILE ../modulos_verilog/weights_all.mif
 

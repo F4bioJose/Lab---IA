@@ -9,7 +9,12 @@ class ImageProcessor:
     def __init__(self, img_size=32):
         self.img_size = img_size
         # Carrega o classificador oficial para detecção facial
-        self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        cascade_name = 'haarcascade_frontalface_default.xml'
+        if hasattr(cv2, 'data'):
+            cascade_path = cv2.data.haarcascades + cascade_name
+        else:
+            cascade_path = '/usr/share/opencv4/haarcascades/' + cascade_name
+        self.face_cascade = cv2.CascadeClassifier(cascade_path)
 
     def detect_and_crop(self, frame):
         """Detecta face com estratégia adaptativa em cascata, aplica CLAHE para iluminação e faz o crop com padding oficial."""
