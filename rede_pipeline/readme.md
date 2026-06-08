@@ -4,7 +4,7 @@
 Este documento detalha o desenvolvimento do sistema de inteligência artificial para o projeto de uma fechadura biométrica utilizando a placa FPGA DE2-115. O foco desta etapa foi a criação de um pipeline robusto para aquisição de dados, treinamento de uma **Tiny-CNN** otimizada e a exportação dos parâmetros quantizados para o hardware.
 
 ## 2. Desenvolvimento do Dataset
-O dataset foi projetado para um problema de classificação binária focado em segurança: **Classe 1 (Autorizados)** e **Classe 0 (Desconhecidos)**.
+O dataset foi projetado para um problema de classificação multiclasse com **19 classes**: **Classe 0 (Desconhecidos)** e **Classes 1–18 (Membros autorizados)**.
 
 ### Classe 1: Autorizados (Equipe)
 * **Origem e Processamento**: Imagens extraídas de vídeos `.mp4` ou pastas, utilizando o algoritmo *Haar Cascade* com `scaleFactor=1.2` para detecção facial.
@@ -21,7 +21,7 @@ Para minimizar falsos positivos, a Classe 0 foi expandida para garantir maior di
 ## 3. Arquitetura e Treinamento Otimizado
 A rede foi projetada para ser leve (**Tiny-CNN**) visando a implementação em blocos de memória M9K da FPGA.
 
-* **Arquitetura**: Entrada 32x32 -> Conv2D (4 filtros 3x3) -> ReLU -> Max-Pooling 2x2 -> Dropout -> Dense -> Sigmoid.
+* **Arquitetura**: Entrada 32x32 -> Conv2D (4 filtros 3x3) -> ReLU -> Max-Pooling 2x2 -> Dropout -> Dense (19 classes) -> Softmax.
 * **Busca de Hiperparâmetros**: Uso do **Keras Tuner** (Hyperband) para otimizar a taxa de **Dropout (0.2 a 0.5)**, neurônios da camada oculta, **Learning Rate** e regularização **L2**.
 * **Estabilidade**: Inclusão de regularização **L2** para manter os pesos pequenos, facilitando a quantização posterior.
 * **Custom Loss Weighting**: Aplicação de pesos manuais (**1.0 para Classe 0 e 4.0 para Classe 1**) para priorizar o reconhecimento correto da equipe.

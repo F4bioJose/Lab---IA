@@ -1,8 +1,14 @@
 # Fluxo de Testagem: CNN Hardware vs. Software
 
-Este documento descreve o fluxo oficial passo a passo para testar e validar o alinhamento perfeito entre o modelo Keras (Software) e a implementação na FPGA (Hardware).
+Este documento descreve o fluxo oficial passo a passo para testar e validar o alinhamento entre o modelo Keras (Software) e a implementação na FPGA (Hardware).
 
-O processo garante que ambos os sistemas processem a mesma imagem visual, mas cada um respeitando estritamente os seus domínios de representação (Ponto Flutuante vs. Ponto Fixo Q1.7/Q2.14).
+O processo garante que ambos os sistemas processem a mesma imagem visual, mas cada um respeitando estritamente os seus domínios de representação (Ponto Flutuante vs. Ponto Fixo Q1.7/Q2.14/Q6.10).
+
+> **Atalho:** Para executar todo o fluxo automaticamente em um único comando, use o script [`run_pipeline.sh`](../scripts/run_pipeline.sh):
+> ```bash
+> ./scripts/run_pipeline.sh anna.jpg
+> ```
+> Ele encadeia os passos 2, 3 e 4 abaixo e salva os resultados em `comparacao/plots/<nome>/`.
 
 ---
 
@@ -28,9 +34,11 @@ Durante essa conversão, a imagem sofre os mesmos filtros que a rede aprendeu no
 
 **Comando:**
 ```bash
-python scripts/image_to_hex.py inputs/frame0.jpg inputs/frame0_hex.txt
+python scripts/image_to_hex.py inputs/frame0.jpg
 ```
-**Saída:** `inputs/frame0_hex.txt` (Contém 1024 linhas com valores hexadecimais, simulando a RAM de vídeo).
+**Saída:** `inputs/imgs_hex/frame0_hex.txt` (Contém 1024 linhas com valores hexadecimais, simulando a RAM de vídeo).
+
+> **Nota:** O segundo argumento (caminho de saída) é opcional. Se omitido, o script salva automaticamente em `inputs/imgs_hex/<nome>_hex.txt`.
 
 ### Passo 2.2: Simulação Verilog (ModelSim)
 O arquivo hexadecimal gerado é então empurrado para o *testbench* Verilog, que injeta os pixels na simulação. A rede calcula as camadas (Convolucional, MaxPool, Flatten, Dense) usando acumuladores Q2.14 (16-bits).
@@ -56,21 +64,29 @@ Para permitir a comparação exata contra o Hardware, as saídas são convertida
 ```bash
 python scripts/extract_sw_activations.py --model tiny_cnn_multiclasse.h5 --image inputs/frame0.jpg --outdir comparacao/frame0_teste/sw/
 ```
-**Saída:** Arquivos de ativações na subpasta (ex: `comparacao/frame0_teste/sw/dense_out_sw.txt`).
-*(Dica: Se omitir o `--outdir`, o script criará automaticamente uma pasta com timestamp, e.g., `comparacao/frame0_20260607_143500/sw/`).*
+**Saída:** Arquivos de ativações na subpasta (ex: `comparacao/sw/frame0/dense_out_sw.txt`).
+
+> **Nota:** Se omitir o `--outdir`, o script criará automaticamente uma subpasta baseada no nome da imagem em `comparacao/sw/<nome>/`.
 
 ---
 
-## 4. Comparação Final e Validação (Pearson)
+## 4. Comparação Final e Validação
 
-Com as duas coleções de arquivos `.txt` isoladas e no mesmo formato inteiro de 16-bits, o comparador cruza os dados camada por camada. 
-Ele avalia o RMSE (Erro Quadrático Médio) e a Correlação de Pearson (`r`).
+Com as duas coleções de arquivos `.txt` isoladas e no mesmo formato inteiro de 16-bits, o comparador cruza os dados camada por camada.
+Ele avalia MAE, RMSE, MaxErr, Exato%, e a Correlação de Pearson (`r`).
 
-- **Correlação nas camadas iniciais:** Deverá atingir níveis estratosféricos (ex: `r = 0.9998`), com microvariações surgindo unicamente porque o SW opera em precisão flutuante infinita contra os limites do ponto fixo Q1.7 original.
-- **Camada Densa (Final):** Como os limites de ativação ultrapassam o que um registrador de 16-bits comporta (`[-2.0, +1.999]`), o *Logit* correto saturará no limite exato de `32767`, enquanto as demais classes erradas saturarão em `-32768`. Isso gera uma Correlação de Pearson cravada de **1.000**.
+A forma mais simples de rodar a comparação é passar a imagem original — o script infere automaticamente os diretórios de SW e HW:
 
-**Comando:**
+**Comando (recomendado):**
 ```bash
-python scripts/compare_sw_hw.py --sw-dir comparacao/frame0_teste/sw/ --hw-dir comparacao/frame0_teste/hw/ --outdir comparacao/frame0_teste/plots/
+python scripts/compare_sw_hw.py --image inputs/frame0.jpg
 ```
-**Saída:** Relatório final detalhado em `comparacao/frame0_teste/plots/report.txt` e gráficos anexos na mesma pasta.
+
+**Comando (explícito, se os diretórios não seguirem a convenção padrão):**
+```bash
+python scripts/compare_sw_hw.py --sw-dir comparacao/sw/frame0/ --hw-dir comparacao/hw/frame0/ --outdir comparacao/plots/frame0/
+```
+
+**Saída:** Relatório final em `comparacao/plots/frame0/report.txt` e gráficos na mesma pasta.
+
+Para uma explicação detalhada de cada métrica e gráfico gerado, consulte [`metricas_e_graficos.md`](metricas_e_graficos.md).

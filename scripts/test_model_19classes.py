@@ -12,13 +12,13 @@ Realiza as seguintes verificações:
   5. Exporta os pesos em formato .hex (para validação manual)
   6. Gera um relatório de sanidade completo
 
-Mapeamento de Classes:
+Mapeamento de Classes (ordem Keras — string sort):
   0 = Desconhecido (classe nativa da rede, Softmax)
-  1 = Anna Carol  | 2 = Bruno     | 3 = Diego     | 4 = Eduardo
-  5 = Fabio       | 6 = Felipe    | 7 = Gabriel   | 8 = Horacio
-  9 = Hugo        | 10 = Igor     | 11 = Joao     | 12 = Jose Henrique
-  13 = Julia      | 14 = Lucio    | 15 = Naira    | 16 = Rafael
-  17 = Samuel     | 18 = Yuri
+  1 = Igor        | 2 = Joao      | 3 = Jose Henrique | 4 = Julia
+  5 = Lucio       | 6 = Naira     | 7 = Rafael    | 8 = Samuel
+  9 = Yuri        | 10 = Anna Carol | 11 = Bruno  | 12 = Diego
+  13 = Eduardo    | 14 = Fabio    | 15 = Felipe   | 16 = Gabriel
+  17 = Horacio    | 18 = Hugo
 
 Uso:
     # A partir da raiz do projeto (conda env machine_learning):

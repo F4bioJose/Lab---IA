@@ -223,7 +223,7 @@ module cnn_top (
         .done()
     );
 
-    // 6. Memória ROM Compartilhada: Pesos pré-treinados (18 classes)
+    // 6. Memória ROM Compartilhada: Pesos pré-treinados (19 classes)
     weights_shared_rom weights_inst (
         .clk(clk),
         .rst(rst),

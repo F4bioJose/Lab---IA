@@ -70,12 +70,13 @@ Lab---IA/
 │   └── cnn_inference.sdc         # Timing constraints (50 MHz)
 │
 ├── scripts/                      # Automação e testagem
+│   ├── run_pipeline.sh           # Pipeline automatizado (hex → sim → keras → gráficos)
 │   ├── run_project.do            # Compilação + simulação (Questa/ModelSim)
 │   ├── extract_sw_activations.py # Extração SW de ativações por camada
 │   ├── compare_sw_hw.py          # Comparação gráfica SW vs. HW
 │   ├── image_to_hex.py           # Converte .jpg → .txt hex para testbench
 │   ├── send_image_32x32.py       # Envio de imagem para a FPGA via UART
-│   └── test_model_19classes.py   # Teste de sanidade da rede Keras
+│   └── test_model_19classes.py   # Teste de sanidade da rede Keras (pesos, .mif, inferência)
 │
 ├── rede_pipeline/                # Pipeline de treinamento da rede
 │   ├── src/                      # Código-fonte do treinamento
@@ -88,14 +89,14 @@ Lab---IA/
 │       ├── inference_webcam.py   # Inferência ao vivo via webcam
 │       └── ...
 │
-├── inputs/                       # Imagens de teste
-├── comparacao/                   # Saídas de comparação SW vs. HW
+├── inputs/                       # Imagens de teste (gerado localmente)
+├── comparacao/                   # Saídas de comparação SW vs. HW (gerado localmente)
 ├── explicacoes/                  # Documentação técnica
 │   ├── pipeline.md               # Arquitetura completa e fluxo de dados
 │   ├── FSM.md                    # Máquinas de estado (diagramas + ciclos)
+│   ├── metricas_e_graficos.md    # Métricas de validação e interpretação dos gráficos
 │   └── fluxo_de_testes_hw_sw.md  # Guia do fluxo de testagem
 │
-├── notebooks_rede/               # Notebooks de experimentação
 ├── haarcascade_frontalface_default.xml
 ├── tiny_cnn_multiclasse.h5       # Modelo treinado (19 classes)
 └── README.md
@@ -217,7 +218,7 @@ pip install tensorflow opencv-python numpy matplotlib scipy pyserial
 
 ## Documentação Técnica
 
-- **[Métricas e Gráficos do Relatório](explicacoes/metricas_e_graficos.md)** — Explicação minuciosa (MAE, RMSE, Pearson) de validação do Hardware.
+- **[Métricas e Gráficos de Validação](explicacoes/metricas_e_graficos.md)** — Explicação detalhada das métricas (MAE, RMSE, Pearson) e interpretação de cada gráfico gerado pelo comparador
 - **[Arquitetura e Pipeline](explicacoes/pipeline.md)** — Fluxo de dados completo, detalhamento de cada módulo, formatos numéricos (Q1.7 / Q2.14 / Q3.21 / Q6.10)
 - **[Máquinas de Estado](explicacoes/FSM.md)** — FSM de inferência e lógica de captura dos LEDs, diagramas Mermaid
 - **[Fluxo de Testagem](explicacoes/fluxo_de_testes_hw_sw.md)** — Guia passo a passo para validação SW vs. HW

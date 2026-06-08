@@ -216,7 +216,7 @@ acc[i] += signed(x_in) × signed(weight_rom[dense_addr * 19 + i])
 
 Ao `flat_done`:
 ```
-score[i] = saturate((acc[i] + bias[i]) >>> 7, INT16)
+score[i] = saturate((acc[i] + bias[i]) >>> 11, INT16)
 ```
 
 > Implementado **sem nenhum `for` loop** — todos os 19 acumuladores e 19 assigns de score são instâncias explícitas. Isso dá controle preciso ao sintetizador sobre o mapeamento lógico.
@@ -363,7 +363,7 @@ A síntese usa o arquivo `weights_all.mif` diretamente para inicializar os bloco
 
 ## 8. Notas de Implementação
 
-- **Sem `for` loops nos módulos críticos** (`dense_900x18`, `argmax_threshold_18`, `weights_shared_rom`): todos os 18 caminhos de dados são instâncias explícitas, dando ao sintetizador controle preciso sobre o mapeamento lógico.
-- **Arquivo único de pesos**: toda a ROM é um array linear. Não há divisão por camada ou por classe — o endereçamento é calculado por offsets parametrizados.
-- **Threshold facilmente alterável**: basta modificar `THRESH_Q2_14` em `argmax_threshold_18.v`. O valor 15564 = `int(0.95 × 16384)`.
+- **Sem `for` loops nos módulos críticos** (`dense_900x19`, `argmax_19`, `weights_shared_rom`): todos os 19 caminhos de dados são instâncias explícitas, dando ao sintetizador controle preciso sobre o mapeamento lógico.
+- **Arquivo único de pesos**: toda a ROM é um array linear de 17.159 bytes. O endereçamento é calculado por offsets parametrizados (`OFF_CONV_W`, `OFF_CONV_B`, `OFF_DENSE_W`, `OFF_DENSE_B`).
+- **Classe de rejeição nativa**: a classe 0 (Desconhecido) é uma saída treinada da rede via Softmax — não há threshold estático. A decisão é puramente por argmax.
 - **Inferência automática**: ao receber 1024 bytes pela UART, a FSM dispara automaticamente sem necessidade de botão.
