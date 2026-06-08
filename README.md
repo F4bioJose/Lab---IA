@@ -1,118 +1,47 @@
-# Artefato 3 — Pipeline UART → VGA (DE2-115)
+# Nova Feature: Overlay de Sprites de Identificação (VGA)
 
-Sistema sintetizável para a placa DE2-115 (Cyclone IV E) que recebe uma imagem de rosto detectado via Haarcascade em resolução 64×64 (escala de cinza) via UART serial a 230400 baud e a exibe em tempo real no monitor VGA com supersampling 6x centrado.
+Esta etapa do projeto é uma expansão do pipeline de vídeo pré-existente (system_top). O objetivo foi implementar a exibição dinâmica do nome do usuário identificado pela rede neural, renderizando um letreiro de texto em tempo real abaixo do frame de vídeo (SRAM) no monitor VGA.
+## 1. Arquivos Acrescentados
 
-## Arquitetura
+    rom_sprites.mif: Arquivo de inicialização de memória (Memory Initialization File) contendo a matriz binária de todos os pixels dos letreiros.
 
-```
-PC (Webcam + Haarcascade + Python)  ──UART 230400 baud──▶  FPGA DE2-115  ──VGA 640×480──▶  Monitor
-                                      4.096 bytes/frame     uart_rx → BRAM → Supersampling → VGA
-```
+    rom_sprites.v / .qip: Módulos HDL gerados através do IP Catalog (MegaWizard) da Intel/Altera para instanciar a memória física no FPGA.
 
-| Bloco | Módulo | Clock | Função |
-|-------|--------|-------|--------|
-| UART RX | `uart_rx.v` | 50 MHz | Recebe bytes seriais a 230400 baud |
-| Framebuffer | Inline em `system_top.v` | 50/25 MHz | BRAM dual-port 4.096×8 (escrita@50, leitura@25) |
-| PLL | `vga_pll.v` | — | Converte 50 MHz → 25.175 MHz (pixel clock) |
-| VGA Sync | `vga_sync.v` | 25 MHz | Gera timing 640×480 @ 60Hz (hsync, vsync) |
-| Supersampling | Inline em `system_top.v` | 25 MHz | Nearest-neighbor 64×64 → ampliado 6x centrado |
+## 2. Modelagem e Geração dos Sprites (HTML/CSS)
 
-## Pipeline de Processamento
+Para evitar artefatos de renderização e perda de nitidez nas fontes, optamos por não utilizar editores de imagem convencionais.
+Os sprites foram gerados renderizando um arquivo HTML/CSS contendo as caixas de texto com fontes sem serifa. O CSS garantiu dimensões absolutas no nível do pixel, permitindo a extração de uma "fita" perfeita, onde o branco representa o bit lógico 1 (texto) e o preto representa o bit 0 (fundo). Um script Python/OpenCV foi utilizado para varrer essa imagem e convertê-la no arquivo .mif.
+## 3. Dimensionamento e Arquitetura de Memória
 
-1. **Webcam** captura frame em tempo real
-2. **Haarcascade** detecta rostos no frame
-   - Se rosto encontrado: recorta a região do rosto, redimensiona para 64×64
-   - Se nenhum rosto: mantém o último rosto válido detectado
-3. **UART** envia os 4.096 bytes (64×64 pixels grayscale) a 230400 baud (~0,178s = ~5 FPS)
-4. **FPGA** armazena em BRAM e exibe via VGA com supersampling 6x para 384x384 centrado em 640x480
+A escolha das dimensões da caixa de texto foi guiada pela otimização extrema dos blocos de memória (M9K) e portas lógicas do Cyclone IV:
 
-## Estrutura de Arquivos
+    Tamanho do Sprite: 256px de largura por 32px de altura. Essa proporção garante que o tamanho do bloco de cada aluno seja uma potência de 2 exata (8.192 pixels).
 
-```
-Lab---IA/
-├── haarcascade_frontalface_default.xml  ← Classificador de rostos
-├── modulos_verilog/
-│   └── uart_rx.v              ← Receptor UART (FSM 4 estados)
-├── vga_artefato/
-│   ├── system_top.v           ← Top-level (integra tudo + supersampling)
-│   ├── vga_sync.v             ← Gerador de timing VGA
-│   ├── vga_pll.v              ← PLL Altera MegaFunction
-│   ├── vga_pll_bb.v           ← Black-box do PLL (simulação)
-│   ├── vga_pll_sim.v          ← Stub do PLL (Icarus Verilog)
-│   ├── vga_pll.qip            ← IP do PLL
-│   ├── top_vga.qpf            ← Projeto Quartus
-│   ├── top_vga.qsf            ← Pin assignments DE2-115
-│   └── tb_system_top.v        ← Testbench (UART simulado)
-├── scripts/
-│   └── send_image.py          ← Webcam + Haarcascade → UART (Python)
-└── README.md
-```
+    Capacidade: A ROM foi dimensionada para comportar 19 classes (Sendo o ID = 0 reservado para estado "Desconhecido", e os IDs 1 a 18 para os alunos cadastrados).
 
-## Síntese no Quartus
+    Endereçamento: A fita vertical completa possui 155.648 endereços. Graças à arquitetura em potência de 2, a transição entre os nomes não exige circuitos multiplicadores: o FPGA localiza a página de memória aplicando um simples Bit Shift de 13 casas no class_id.
 
-1. Abra `vga_artefato/top_vga.qpf` no Quartus Prime 18.1+
-2. Compile: **Processing → Start Compilation** (Ctrl+L)
-3. Programe: **Tools → Programmer** → selecione o USB-Blaster → **Start**
+## 4. Instanciação da ROM (MegaWizard)
 
-O top-level entity é `system_top` e o dispositivo alvo é `EP4CE115F29C7`.
+Para acomodar a estrutura acima, utilizamos o MegaWizard para alocar uma ROM 1-PORT de 1 bit de largura por 155.648 de profundidade. O barramento de endereço (address) foi dimensionado com 18 bits para cobrir toda a memória. A ROM foi pré-carregada com o arquivo rom_sprites.mif nativamente na compilação.
+## 5. Reutilização do Pipeline de Vídeo (system_top)
 
-## Envio de Imagem (Python)
+A infraestrutura de letreiros aproveitou integralmente a lógica de temporização de 25.175 MHz pré-existente.
 
-```bash
-pip install opencv-python pyserial numpy
+    Foram criados parâmetros de offset (H_START_SPRITE, V_START_SPRITE) para posicionar a bounding box do nome (256x32) perfeitamente centralizada e imediatamente abaixo do frame de 384x384 vindo da UART/SRAM.
 
-# Webcam contínua com detecção de rosto (padrão)
-python scripts/send_image.py --port /dev/ttyUSB0
+    A latência de 1 ciclo de clock da nova ROM foi compensada criando o registrador de atraso in_sprite_window_d.
 
-# Sem detecção de rosto (envia frame completo)
-python scripts/send_image.py --port /dev/ttyUSB0 --no-haar
+    O multiplexador de renderização (always @*) foi expandido para atuar como um sistema de camadas (Layers), priorizando a escrita da SRAM na área da foto, e da ROM na área do texto.
 
-# Imagem estática
-python scripts/send_image.py --file foto.png --port /dev/ttyUSB0
+## 6. Simulação de Teste via Hardware (Switches)
 
-# Teste sem placa (modo simulação)
-python scripts/send_image.py --mock
-```
+Como o módulo da Inteligência Artificial (CNN) ainda está em desenvolvimento, a validação visual do hardware foi construída injetando sinais diretos das chaves da placa DE2-115:
 
-### Parâmetros
+    SW[4:0]: Codificam um número binário de 5 bits para simular a mudança instantânea do class_id de 0 a 18, paginando os diferentes nomes na tela.
 
-| Parâmetro | Default | Descrição |
-|-----------|---------|-----------|
-| `--port` | `/dev/ttyUSB0` | Porta serial |
-| `--baud` | `230400` | Baud rate (máximo seguro para MAX3232) |
-| `--camera` | `0` | Índice da câmera |
-| `--file` | — | Enviar imagem estática |
-| `--once` | — | Enviar apenas um frame |
-| `--mock` | — | Simulação sem placa |
-| `--no-haar` | — | Desabilitar detecção de rosto |
+    SW[17]: Simula o estado access_granted, alterando a cor de pintura do texto ativamente entre vermelho (negado) e verde (autorizado).
 
-## Simulação (Icarus Verilog)
+## 7. Próximos Passos (Integração com a CNN)
 
-```bash
-iverilog -g2005 -o sim_out \
-  vga_artefato/tb_system_top.v \
-  vga_artefato/system_top.v \
-  vga_artefato/vga_sync.v \
-  vga_artefato/vga_pll_sim.v \
-  modulos_verilog/uart_rx.v
-
-vvp sim_out
-```
-
-Resultado esperado:
-```
-  frame_mem[0]      = 0 (esperado: 0)
-  frame_mem[63]     = 63 (esperado: 63)
-  frame_mem[255]    = 255 (esperado: 255)
-  frame_mem[4095]   = 255 (esperado: 255)
-  LEDG (frame_received) = 1
---- Simulacao concluida com sucesso ---
-```
-
-## Controles na Placa
-
-| Controle | Função |
-|----------|--------|
-| **KEY[0]** | Reset (pressionar para resetar) |
-| **LEDG[0]** | Acende quando o 1° frame completo é recebido |
-| **LEDR[9:0]** | Progresso do endereço de escrita UART |
+Na versão final (produção), os barramentos de chaves físicas (SW) serão desativados. O parâmetro class_id passará a receber o fio out_class_id gerado como output do módulo da rede neural, tornando a identificação biométrica e o salto de memória na ROM operações automáticas e combinacionais.
