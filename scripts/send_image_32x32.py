@@ -261,63 +261,70 @@ def main():
             ser.close()
         return
 
-    # === Modo webcam (captura única) ===
+    # === Modo webcam (captura contínua) ===
     cap = cv2.VideoCapture(args.camera)
     if not cap.isOpened():
         print(f"[ERRO] Não foi possível abrir a câmera {args.camera}")
         sys.exit(1)
 
-    print(f"[OK] Câmera {args.camera} aberta. Capturando 1 frame...")
+    print(f"[OK] Câmera {args.camera} aberta. Transmitindo vídeo ao vivo...")
+    print("[INFO] Pressione 'q' na janela de preview ou Ctrl+C no terminal para sair.")
 
-    ret, frame_bgr = cap.read()
-    if not ret:
-        print("[ERRO] Falha na captura da câmera.")
-        cap.release()
-        sys.exit(1)
+    try:
+        frames_enviados = 0
+        t_start = time.time()
+        while True:
+            ret, frame_bgr = cap.read()
+            if not ret:
+                print("[ERRO] Falha na captura da câmera.")
+                break
 
-    # Converte para grayscale
-    gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
+            # Converte para grayscale
+            gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
 
-    # CLAHE — idêntico ao preprocessor.py do treinamento
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    gray = clahe.apply(gray)
+            # CLAHE — idêntico ao preprocessor.py do treinamento
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+            gray = clahe.apply(gray)
 
-    out_frame = gray
-    if face_cascade is not None:
-        roi, rect = detect_face_adaptive(gray, face_cascade)
-        if roi is not None:
-            out_frame = roi
-            print(f"[OK] Rosto detectado: {rect}")
-        else:
-            print("[AVISO] Nenhum rosto detectado, enviando frame completo.")
+            out_frame = gray
+            if face_cascade is not None:
+                roi, rect = detect_face_adaptive(gray, face_cascade)
+                if roi is not None:
+                    out_frame = roi
 
-    frame_32 = cv2.resize(out_frame, (IMG_SIZE, IMG_SIZE),
-                          interpolation=cv2.INTER_AREA)
+            frame_32 = cv2.resize(out_frame, (IMG_SIZE, IMG_SIZE),
+                                  interpolation=cv2.INTER_AREA)
 
-    # Envia o frame
-    if not args.raw:
-        frame_32 = quantize_to_q17(frame_32)
-        print("[OK] Frame quantizado para Q1.7 (0..127)")
-    t0 = time.time()
-    raw = send_frame(ser, frame_32)
-    elapsed = time.time() - t0
-    print(f"[OK] Frame capturado e enviado ({FRAME_BYTES} bytes em {elapsed:.3f}s)")
+            # Envia o frame
+            if not args.raw:
+                frame_32 = quantize_to_q17(frame_32)
+                
+            raw = send_frame(ser, frame_32)
+            frames_enviados += 1
 
-    # Preview
-    if args.preview:
-        preview = cv2.resize(frame_32, (256, 256), interpolation=cv2.INTER_NEAREST)
-        cv2.imshow(f"Preview {IMG_SIZE}x{IMG_SIZE} -> FPGA", preview)
-        print("[INFO] Pressione qualquer tecla na janela de preview para sair.")
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+            # Preview
+            if args.preview:
+                preview = cv2.resize(frame_32, (256, 256), interpolation=cv2.INTER_NEAREST)
+                cv2.imshow(f"Preview {IMG_SIZE}x{IMG_SIZE} -> FPGA", preview)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+            else:
+                # Dá um print esporádico para mostrar que está vivo
+                if frames_enviados % 30 == 0:
+                    fps = frames_enviados / (time.time() - t_start)
+                    print(f"[INFO] Enviando frame {frames_enviados}... (Média: {fps:.1f} fps)")
 
-    print(f"[DEBUG] Primeiros 8 bytes: {' '.join(f'{b:02X}' for b in raw[:8])}")
-    print(f"[DEBUG] Últimos  8 bytes: {' '.join(f'{b:02X}' for b in raw[-8:])}")
+    except KeyboardInterrupt:
+        print("\n[INFO] Captura interrompida pelo usuário.")
 
     cap.release()
+    if args.preview:
+        cv2.destroyAllWindows()
     if ser is not None:
         ser.close()
-    print("[FIM] Inferência disparada na FPGA. Observe os LEDs LEDG.")
+    
+    t_total = time.time() - t_start
+    print(f"[FIM] Transmissão encerrada. Total de frames enviados: {frames_enviados} em {t_total:.1f}s.")
 
 
 if __name__ == "__main__":

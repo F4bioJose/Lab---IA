@@ -1,11 +1,12 @@
 # -------------------------------------------------------------------------- #
-# Quartus Prime — Inferência CNN (Imagem via UART → LEDs)
+# Quartus Prime — Projeto Unificado: Inferência CNN + Exibição VGA
+# Pipeline: UART → CNN (19 classes) + VGA (imagem + sprite de nome)
 # Placa: DE2-115 (EP4CE115F29C7, Cyclone IV E)
 # -------------------------------------------------------------------------- #
 
 set_global_assignment -name FAMILY "Cyclone IV E"
 set_global_assignment -name DEVICE EP4CE115F29C7
-set_global_assignment -name TOP_LEVEL_ENTITY fpga_top_de2115
+set_global_assignment -name TOP_LEVEL_ENTITY fpga_top_unified
 set_global_assignment -name ORIGINAL_QUARTUS_VERSION 18.1.0
 set_global_assignment -name LAST_QUARTUS_VERSION "25.1std.0 Lite Edition"
 set_global_assignment -name PROJECT_OUTPUT_DIRECTORY output_files
@@ -24,7 +25,6 @@ set_global_assignment -name EDA_SIMULATION_TOOL "Questa Altera FPGA (Verilog)"
 set_global_assignment -name EDA_TIME_SCALE "1 ps" -section_id eda_simulation
 set_global_assignment -name EDA_OUTPUT_DATA_FORMAT "VERILOG HDL" -section_id eda_simulation
 
-
 # =========================================================================
 # PIN ASSIGNMENTS — DE2-115
 # =========================================================================
@@ -32,12 +32,49 @@ set_global_assignment -name EDA_OUTPUT_DATA_FORMAT "VERILOG HDL" -section_id eda
 # --- Clock 50 MHz ---
 set_location_assignment PIN_Y2 -to CLOCK_50
 
-# --- KEYs (active-low, com debounce por Schmitt Trigger na placa) ---
-set_location_assignment PIN_M23 -to KEY[0]
-set_location_assignment PIN_M21 -to KEY[1]
+# --- KEY (active-low, com debounce por Schmitt Trigger na placa) ---
+# KEY[0] = Reset global — único botão utilizado
+set_location_assignment PIN_M23 -to KEY
 
 # --- UART (RS-232 via MAX3232 transceiver na DE2-115) ---
 set_location_assignment PIN_AB21 -to UART_RXD
+
+# --- VGA (DAC ADV7123) ---
+set_location_assignment PIN_G13 -to VGA_HS
+set_location_assignment PIN_C13 -to VGA_VS
+set_location_assignment PIN_A12 -to VGA_CLK
+set_location_assignment PIN_F11 -to VGA_BLANK_N
+set_location_assignment PIN_C10 -to VGA_SYNC_N
+
+# VGA Vermelho (Red)
+set_location_assignment PIN_E12 -to VGA_R[0]
+set_location_assignment PIN_E11 -to VGA_R[1]
+set_location_assignment PIN_D10 -to VGA_R[2]
+set_location_assignment PIN_F12 -to VGA_R[3]
+set_location_assignment PIN_G10 -to VGA_R[4]
+set_location_assignment PIN_J12 -to VGA_R[5]
+set_location_assignment PIN_H8 -to VGA_R[6]
+set_location_assignment PIN_H10 -to VGA_R[7]
+
+# VGA Verde (Green)
+set_location_assignment PIN_G8 -to VGA_G[0]
+set_location_assignment PIN_G11 -to VGA_G[1]
+set_location_assignment PIN_F8 -to VGA_G[2]
+set_location_assignment PIN_H12 -to VGA_G[3]
+set_location_assignment PIN_C8 -to VGA_G[4]
+set_location_assignment PIN_B8 -to VGA_G[5]
+set_location_assignment PIN_F10 -to VGA_G[6]
+set_location_assignment PIN_C9 -to VGA_G[7]
+
+# VGA Azul (Blue)
+set_location_assignment PIN_B10 -to VGA_B[0]
+set_location_assignment PIN_A10 -to VGA_B[1]
+set_location_assignment PIN_C11 -to VGA_B[2]
+set_location_assignment PIN_B11 -to VGA_B[3]
+set_location_assignment PIN_A11 -to VGA_B[4]
+set_location_assignment PIN_C12 -to VGA_B[5]
+set_location_assignment PIN_D11 -to VGA_B[6]
+set_location_assignment PIN_D12 -to VGA_B[7]
 
 # --- LEDs Verdes (LEDG[7:0]) — Resultado da classificação ---
 set_location_assignment PIN_E21 -to LEDG[0]
@@ -58,39 +95,61 @@ set_global_assignment -name STRATIX_DEVICE_IO_STANDARD "2.5 V"
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to CLOCK_50
 set_instance_assignment -name PCI_IO ON -to CLOCK_50
 
-# KEYs (Bank 6 — 2.5V)
-set_instance_assignment -name IO_STANDARD "2.5 V" -to KEY[0]
-set_instance_assignment -name IO_STANDARD "2.5 V" -to KEY[1]
+# KEY (Bank 6 — 2.5V)
+set_instance_assignment -name IO_STANDARD "2.5 V" -to KEY
 
 # UART (Bank 4 — 3.3V)
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to UART_RXD
 set_instance_assignment -name PCI_IO ON -to UART_RXD
 
+# VGA (Bank 4 — 3.3V)
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to VGA_CLK
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to VGA_HS
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to VGA_VS
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to VGA_BLANK_N
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to VGA_SYNC_N
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to VGA_R[*]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to VGA_G[*]
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to VGA_B[*]
+
 # LEDs (Bank 7 — 2.5V)
-set_instance_assignment -name IO_STANDARD "2.5 V" -to LEDG[0]
-set_instance_assignment -name IO_STANDARD "2.5 V" -to LEDG[1]
-set_instance_assignment -name IO_STANDARD "2.5 V" -to LEDG[2]
-set_instance_assignment -name IO_STANDARD "2.5 V" -to LEDG[3]
-set_instance_assignment -name IO_STANDARD "2.5 V" -to LEDG[4]
-set_instance_assignment -name IO_STANDARD "2.5 V" -to LEDG[5]
-set_instance_assignment -name IO_STANDARD "2.5 V" -to LEDG[6]
-set_instance_assignment -name IO_STANDARD "2.5 V" -to LEDG[7]
+set_instance_assignment -name IO_STANDARD "2.5 V" -to LEDG[*]
 
 # =========================================================================
 # CURRENT STRENGTH (Corrige warning 15714: Missing Drive Strength)
 # =========================================================================
 set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to LEDG[*]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_CLK
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_HS
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_VS
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_BLANK_N
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_SYNC_N
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_R[*]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_G[*]
+set_instance_assignment -name CURRENT_STRENGTH_NEW 8MA -to VGA_B[*]
 
 # =========================================================================
 # SLEW RATE (Corrige warning 15714: Missing Slew Rate)
 # =========================================================================
 set_instance_assignment -name SLEW_RATE 2 -to LEDG[*]
+set_instance_assignment -name SLEW_RATE 2 -to VGA_CLK
+set_instance_assignment -name SLEW_RATE 2 -to VGA_HS
+set_instance_assignment -name SLEW_RATE 2 -to VGA_VS
+set_instance_assignment -name SLEW_RATE 2 -to VGA_BLANK_N
+set_instance_assignment -name SLEW_RATE 2 -to VGA_SYNC_N
+set_instance_assignment -name SLEW_RATE 2 -to VGA_R[*]
+set_instance_assignment -name SLEW_RATE 2 -to VGA_G[*]
+set_instance_assignment -name SLEW_RATE 2 -to VGA_B[*]
 
 # =========================================================================
-# ARQUIVOS FONTE — Todos os módulos Verilog do pipeline CNN
+# SEARCH PATH — Para localizar MIF files em diretórios vizinhos
 # =========================================================================
-set_global_assignment -name SDC_FILE cnn_inference.sdc
-set_global_assignment -name SYSTEMVERILOG_FILE ../modulos_verilog/fpga_top_de2115.v
+set_global_assignment -name SEARCH_PATH ../vga_artefato
+
+# =========================================================================
+# ARQUIVOS FONTE — Pipeline CNN (módulos Verilog)
+# =========================================================================
+set_global_assignment -name SYSTEMVERILOG_FILE ../modulos_verilog/fpga_top_unified.v
 set_global_assignment -name SYSTEMVERILOG_FILE ../modulos_verilog/cnn_top.v
 set_global_assignment -name SYSTEMVERILOG_FILE ../modulos_verilog/uart_rx.v
 set_global_assignment -name SYSTEMVERILOG_FILE ../modulos_verilog/framebuffer_32x32.v
@@ -103,6 +162,21 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../modulos_verilog/argmax_19.v
 set_global_assignment -name SYSTEMVERILOG_FILE ../modulos_verilog/weights_shared_rom.v
 set_global_assignment -name MIF_FILE ../modulos_verilog/weights_all.mif
 
+# =========================================================================
+# ARQUIVOS FONTE — Pipeline VGA (gerador de timing + IPs Altera)
+# =========================================================================
+set_global_assignment -name VERILOG_FILE ../vga_artefato/vga_sync.v
+set_global_assignment -name QIP_FILE ../vga_artefato/vga_pll.qip
+set_global_assignment -name QIP_FILE ../vga_artefato/rom_sprites.qip
+
+# =========================================================================
+# TIMING CONSTRAINTS
+# =========================================================================
+set_global_assignment -name SDC_FILE cnn_inference.sdc
+
+# =========================================================================
+# PARTICIONAMENTO
+# =========================================================================
 set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
 set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
 set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top

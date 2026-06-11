@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Imagens e vídeos
 *.jpg
 *.jpeg
@@ -10,8 +9,8 @@
 *.zip
 
 # Pastas com dados gerados ou temporários
-imagens
-inputs
+imagens/
+inputs/
 comparacao/
 videos/
 
@@ -34,41 +33,28 @@ tuner_logs/
 models/
 mlruns/
 *.db
-rede_pipeline/docs/
-rede_pipeline/reports/
 
 # Arquivos gerados pelo Quartus (Mantenha apenas os .qpf, .qsf e .sdc no Git)
 quartus_cnn/output_files/
 quartus_cnn/db/
 quartus_cnn/incremental_db/
 quartus_cnn/simulation/
+quartus_cnn/greybox_tmp/
 quartus_cnn/*.rpt
+quartus_cnn/*.qdf
 quartus_cnn/*.smsg
 quartus_cnn/*.summary
 quartus_cnn/*.done
 quartus_cnn/*.pin
 quartus_cnn/*.jdi
 quartus_cnn/*.qws
+quartus_cnn/*.sld
 
-# Arquivos gerados pelo ModelSim / Simulador
-*.wlf
-transcript
-modelsim.ini
-work/
-
-# Arquivos de exportação dinâmica da rede
-rede_pipeline/export/
-
-# Notebooks de testagem
-notebooks_rede/
-=======
-
-# Quartus Prime build directories
+# Diretórios antigos Quartus (se existirem na raiz)
 db/
 incremental_db/
 output_files/
 simulation/
-sim_out/
 greybox_tmp/
 *.rpt
 *.qdf
@@ -79,5 +65,10 @@ greybox_tmp/
 *.pin
 *.jdi
 *.sld
->>>>>>> feat/vga-display-names
 
+# Arquivos gerados pelo ModelSim / Simulador
+*.wlf
+transcript
+modelsim.ini
+work/
+sim_out/
