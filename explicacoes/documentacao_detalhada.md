@@ -120,33 +120,33 @@ stateDiagram-v2
     
     state SYS_RESET_CLEAR {
         direction LR
-        note "Aperto de KEY[0]"
         [*] --> hardware_clear_m9k: clear_addr 0..1023
-        hardware_clear_m9k --> FSM_AWAIT: limpa buffers/VGA (preto)
+        hardware_clear_m9k --> Limpeza_Completa: tela_preta
     }
+    note right of SYS_RESET_CLEAR: Aperto de KEY[0]
 
     state FSM_AWAIT {
-        note "FSM IDLE - Sem inferência pronta"
         display_class_id_0: display_class_id = 0
         sprite_desconhecido: Sprite = Desconhecido (Vermelho)
     }
+    note right of FSM_AWAIT: FSM IDLE - Sem inferência pronta
 
     state FSM_RECEIVING_FRAME {
-        note "UART RX em andamento"
         UART_Data: UART_RX enchendo mem_a e mem_b
         display_class_id_0_ag: display_class_id = 0
     }
+    note right of FSM_RECEIVING_FRAME: UART RX em andamento
 
     state FSM_INFERENCE_DONE {
-        note "Inferência Resolvida"
         latch_resultado: display_class_id = class_id_cnn
         latch_led: LEDs gravam último ID
-        sprite_dynamic: Se class != 0, Nome (Verde). Senão (Vermelho).
+        sprite_dynamic: Se class != 0, Nome(Verde) senão Vermelho
     }
+    note right of FSM_INFERENCE_DONE: Inferência Resolvida
 
     SYS_RESET_CLEAR --> FSM_AWAIT: Reset Solto
     FSM_AWAIT --> FSM_RECEIVING_FRAME: UART RX detectado
-    FSM_RECEIVING_FRAME --> FSM_AWAIT: Novo frame = apaga resultado atual
+    FSM_RECEIVING_FRAME --> FSM_AWAIT: Novo frame detectado
     
     FSM_RECEIVING_FRAME --> FSM_INFERENCE_DONE: cnn_top(access_done) = 1
     FSM_INFERENCE_DONE --> FSM_RECEIVING_FRAME: Início envio próximo frame
@@ -161,45 +161,45 @@ stateDiagram-v2
     [*] --> ST_IDLE
     
     state ST_IDLE {
-        note "Aguardando frame_ready"
+        Aguardando_frame_ready
     }
     
     ST_IDLE --> ST_CONVOLUTION: frame_ready = 1
     
     state ST_CONVOLUTION {
-        note "Processamento 3x3 Janelado"
         MAC_Units: 4 MACs Paralelos Atuando
         ReLU: Saturação Condicional
     }
+    note right of ST_CONVOLUTION: Processamento 3x3 Janelado
     
     ST_CONVOLUTION --> ST_MAX_POOLING: conv_done = 1
     
     state ST_MAX_POOLING {
-        note "Subsampling 2x2"
         Compara_Arvore: Retém máximo local
     }
+    note right of ST_MAX_POOLING: Subsampling 2x2
     
     ST_MAX_POOLING --> ST_FLATTEN: pool_done = 1
     
     state ST_FLATTEN {
-        note "Serializando Matrizes"
         Mapping_1D: Criando vetor 900 posições
     }
+    note right of ST_FLATTEN: Serializando Matrizes
     
     ST_FLATTEN --> ST_DENSE: flat_done = 1
     
     state ST_DENSE {
-        note "Fully Connected (900x19)"
         Multiplicador_Massivo: 900 * 19 pesos = Logits
     }
+    note right of ST_DENSE: Fully Connected (900x19)
     
     ST_DENSE --> ST_DONE: dense_done = 1
     
     state ST_DONE {
-        note "Sinalização Externa"
         class_id_set: Argmax19 acionado -> ID[4:0] gerado
         access_done_up: Sobe flag para o Top-Level
     }
+    note right of ST_DONE: Sinalização Externa
     
     ST_DONE --> ST_IDLE: próximo frame recebido
 ```
