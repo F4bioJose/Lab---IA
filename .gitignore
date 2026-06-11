@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Imagens e vídeos
 *.jpg
 *.jpeg
@@ -60,4 +61,23 @@ rede_pipeline/export/
 
 # Notebooks de testagem
 notebooks_rede/
+=======
+
+# Quartus Prime build directories
+db/
+incremental_db/
+output_files/
+simulation/
+sim_out/
+greybox_tmp/
+*.rpt
+*.qdf
+*.qws
+*.smsg
+*.summary
+*.done
+*.pin
+*.jdi
+*.sld
+>>>>>>> feat/vga-display-names
 
