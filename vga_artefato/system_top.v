@@ -241,12 +241,12 @@ module system_top (
 	 
 	 wire access_granted = SW[17]; 
 	 // Fios dos Switches
-	 wire [4:0] class_id_simulado = SW[4:0]; // total de nomes e 19 - necessario 5 bits
+	 wire [4:0] class_id_simulado = SW[4:0]; // total de nomes e 19 (com blank no id 0) - necessario 5 bits
 	 
 	 wire [7:0] sprite_x = (pixel_x - H_START_SPRITE); // representar 256 
 	 wire [4:0] sprite_y = (pixel_y - V_START_SPRITE); // representar 32 
 	 wire [12:0] pixel_atual_offset = (sprite_y * 10'd256) + sprite_x; 
-	 wire [17:0] endereco_base_aluno = {class_id_simulado, 13'd0}; //big shift de 13 casas
+	 wire [17:0] endereco_base_aluno = {class_id_simulado + 1'b13, 13'd0}; //big shift de 13 casas agora somando 1 ao class_id
 	 wire [17:0] endereco_mega_rom = endereco_base_aluno + pixel_atual_offset; 
 	 wire pixel_do_sprite;
 	  
