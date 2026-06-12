@@ -1,6 +1,7 @@
 import cv2
 
-def png_to_mif(image_path, mif_path, width = 256, height = 608):
+# SUGESTÃO: usar a captura de tela do firefox para garantir o tamanho exato do png
+def png_to_mif(image_path, mif_path, width = 256, height = 640): # largura e altura deve ser do tamanho (em pixels) do png
 
 
     image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
@@ -34,4 +35,4 @@ def png_to_mif(image_path, mif_path, width = 256, height = 608):
 
         f.write("END;\n")
 
-png_to_mif("mif/sprite-alunos.png", 'rom-sprites.mif')
+png_to_mif("mif/sprite-alunos.png", 'rom_sprites.mif')
