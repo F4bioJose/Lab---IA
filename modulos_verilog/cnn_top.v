@@ -1,9 +1,12 @@
 // ==============================================================================
 // Módulo: cnn_top
-// Descrição: Top-level da arquitetura Tiny-CNN. Instancia, conecta e orquestra
-//            todos os submódulos da rede: Framebuffer, Line Buffer, Convolução,
-//            Max Pooling, Flatten, Camada Densa (19 classes) e Decisão
-//            (Argmax puro — sem threshold, desconhecido = classe 0 nativa).
+// Descrição: Top-level da arquitetura Tiny-CNN com suporte a dois modos de
+//            recepção UART controlados por byte de controle:
+//              0x00 → Frame de vídeo 128×128 (16384 bytes) — apenas display VGA
+//              0xFF → Frame de rosto 32×32 (1024 bytes) — inferência CNN + VGA
+//
+//            O primeiro byte recebido é sempre o byte de controle.
+//            Após o byte de controle, os bytes do frame seguem sequencialmente.
 //
 // Mapeamento de Classes (ordem Keras — string sort das pastas do dataset):
 //   0 = Desconhecido | 1 = Igor | 2 = Joao | 3 = Jose Henrique | 4 = Julia
@@ -31,10 +34,21 @@ module cnn_top (
     input wire [7:0] fb_wr_data,
 
     // [PONTO DE INTEGRAÇÃO - VGA E SRAM EXTERNA]
-    // A varredura de exibição de vídeo se conectará aqui.
+    // A varredura de exibição de vídeo se conectará aqui (framebuffer 32×32).
     input wire vga_rd_en,
     input wire [9:0] vga_rd_addr,
     output wire [7:0] vga_rd_data,
+
+    // [PORTAS DO VIDEO FRAMEBUFFER 128×128]
+    // Escritas geradas internamente pela FSM UART quando frame_mode == 0.
+    // Conectadas ao framebuffer_128x128 externo instanciado no fpga_top.
+    output reg         video_fb_wr_en,
+    output reg  [13:0] video_fb_wr_addr,
+    output reg  [7:0]  video_fb_wr_data,
+
+    // [MODO DO FRAME ATUAL]
+    // 0 = vídeo (128×128, apenas VGA), 1 = rosto (32×32, inferência CNN)
+    output reg         frame_mode,
 
     output wire [15:0] final_result,
     output wire [4:0]  class_id,       // 0 = Desconhecido; 1-18 = pessoa identificada
@@ -51,11 +65,16 @@ module cnn_top (
 
     wire [7:0] uart_data;
     wire uart_valid;
-    reg [9:0] uart_wr_addr;
+    reg [13:0] uart_wr_addr;          // 14 bits: suporta até 16384 (128×128)
     reg uart_start_pulse;
     reg uart_frame_pending;
 
-    // Sinal combinacional para escrita imediata no framebuffer
+    // Modo do frame sendo recebido atualmente via UART
+    // 0 = vídeo (128×128), 1 = rosto (32×32)
+    reg current_frame_mode;
+
+    // Sinal combinacional para escrita imediata no framebuffer 32×32
+    // Só ativo quando estamos recebendo um frame de rosto (mode=1)
     wire uart_wr_en_comb;
 
     wire fb_wr_en_int;
@@ -115,15 +134,23 @@ module cnn_top (
     reg [7:0] debug_or_acc;
 
     // Maquina de estados (FSM) principal para controle do pipeline
-    localparam ST_IDLE  = 2'd0;
-    localparam ST_READ  = 2'd1;
-    localparam ST_WAIT  = 2'd2;
-    localparam ST_DONE  = 2'd3;
+    // ST_IDLE     → aguarda byte de controle via UART
+    // ST_RX_FACE  → recebendo 1024 bytes do frame de rosto (32×32)
+    // ST_RX_VIDEO → recebendo 16384 bytes do frame de vídeo (128×128)
+    // ST_READ     → lendo framebuffer 32×32 para alimentar CNN
+    // ST_WAIT     → aguardando conclusão da inferência CNN
+    // ST_DONE     → pulsa access_done
+    localparam ST_IDLE     = 3'd0;
+    localparam ST_RX_FACE  = 3'd1;
+    localparam ST_RX_VIDEO = 3'd2;
+    localparam ST_READ     = 3'd3;
+    localparam ST_WAIT     = 3'd4;
+    localparam ST_DONE     = 3'd5;
 
-    reg [1:0] state;
+    reg [2:0] state;
 
-    // Evita o atraso de 1 ciclo que causaria off-by-one no endereço
-    assign uart_wr_en_comb = uart_valid && (state == ST_IDLE) && !frame_ready && !uart_frame_pending;
+    // Escrita no framebuffer 32×32: só quando recebendo frame de rosto
+    assign uart_wr_en_comb = uart_valid && (state == ST_RX_FACE);
 
     assign debug_weights_nonzero = |{conv_b0, conv_b1, conv_b2, conv_b3,
                                     dense_b[ 0], dense_b[ 1], dense_b[ 2], dense_b[ 3],
@@ -143,7 +170,7 @@ module cnn_top (
     );
 
     assign fb_wr_en_int    = uart_wr_en_comb | fb_wr_en;
-    assign fb_wr_addr_int  = uart_wr_en_comb ? uart_wr_addr : fb_wr_addr;
+    assign fb_wr_addr_int  = uart_wr_en_comb ? uart_wr_addr[9:0] : fb_wr_addr;
     assign fb_wr_data_int  = uart_wr_en_comb ? uart_data    : fb_wr_data;
     assign start_system_int = start_system | uart_start_pulse;
 
@@ -270,23 +297,28 @@ module cnn_top (
 
     always @(posedge clk or posedge rst) begin
         if (rst) begin
-            rx_sync_1       <= 1'b1;
-            rx_sync_2       <= 1'b1;
-            uart_wr_addr    <= 10'd0;
-            uart_start_pulse <= 1'b0;
+            rx_sync_1          <= 1'b1;
+            rx_sync_2          <= 1'b1;
+            uart_wr_addr       <= 14'd0;
+            uart_start_pulse   <= 1'b0;
             uart_frame_pending <= 1'b0;
-            state           <= ST_IDLE;
-            fb_rd_en        <= 1'b0;
-            fb_rd_en_d      <= 1'b0;
-            fb_rd_addr      <= 10'd0;
-            rd_req_count    <= 11'd0;
-            rd_val_count    <= 11'd0;
-            dense_addr      <= 14'd0;
-            debug_or_acc    <= 8'd0;
-            access_done     <= 1'b0;
-            frame_clear     <= 1'b0;
-            flat_valid_d    <= 1'b0;
-            flat_data_d     <= 16'sd0;
+            current_frame_mode <= 1'b0;
+            frame_mode         <= 1'b0;
+            state              <= ST_IDLE;
+            fb_rd_en           <= 1'b0;
+            fb_rd_en_d         <= 1'b0;
+            fb_rd_addr         <= 10'd0;
+            rd_req_count       <= 11'd0;
+            rd_val_count       <= 11'd0;
+            dense_addr         <= 14'd0;
+            debug_or_acc       <= 8'd0;
+            access_done        <= 1'b0;
+            frame_clear        <= 1'b0;
+            flat_valid_d       <= 1'b0;
+            flat_data_d        <= 16'sd0;
+            video_fb_wr_en     <= 1'b0;
+            video_fb_wr_addr   <= 14'd0;
+            video_fb_wr_data   <= 8'd0;
         end else begin
             rx_sync_1 <= rx_pin;
             rx_sync_2 <= rx_sync_1;
@@ -298,14 +330,15 @@ module cnn_top (
             access_done      <= 1'b0;
             frame_clear      <= 1'b0;
             fb_rd_en_d       <= fb_rd_en;
+            video_fb_wr_en   <= 1'b0;    // Pulso: default off
 
-            // Incremento de endereço UART: avança APÓS a escrita combinacional
+            // Incremento de endereço UART para frame de rosto (32×32)
             if (uart_wr_en_comb) begin
-                if (uart_wr_addr == 10'd1023) begin
-                    uart_wr_addr       <= 10'd0;
+                if (uart_wr_addr == 14'd1023) begin
+                    uart_wr_addr       <= 14'd0;
                     uart_frame_pending <= 1'b1;
                 end else begin
-                    uart_wr_addr <= uart_wr_addr + 10'd1;
+                    uart_wr_addr <= uart_wr_addr + 14'd1;
                 end
             end
 
@@ -315,7 +348,7 @@ module cnn_top (
             end
 
             if (frame_clear) begin
-                uart_wr_addr <= 10'd0;
+                uart_wr_addr <= 14'd0;
                 debug_or_acc <= 8'd0;
             end
 
@@ -333,18 +366,75 @@ module cnn_top (
             end
 
             case (state)
+                // =====================================================
+                // ST_IDLE: Aguarda byte de controle via UART
+                // =====================================================
                 ST_IDLE: begin
                     fb_rd_en     <= 1'b0;
                     fb_rd_addr   <= 10'd0;
                     rd_req_count <= 11'd0;
                     rd_val_count <= 11'd0;
+
+                    // Verificar se há frame de rosto pendente para inferência
                     if (start_system_int && frame_ready && weights_boot_done) begin
                         state       <= ST_READ;
                         frame_clear <= 1'b1;
                         dense_addr  <= 14'd0;
                     end
+                    // Recebeu byte de controle via UART
+                    else if (uart_valid) begin
+                        uart_wr_addr <= 14'd0;
+                        if (uart_data == 8'hFF) begin
+                            // Byte de controle: rosto (32×32)
+                            current_frame_mode <= 1'b1;
+                            state <= ST_RX_FACE;
+                        end else begin
+                            // Byte de controle: vídeo (128×128) — qualquer valor ≠ 0xFF
+                            current_frame_mode <= 1'b0;
+                            state <= ST_RX_VIDEO;
+                        end
+                    end
                 end
 
+                // =====================================================
+                // ST_RX_FACE: Recebendo 1024 bytes do frame de rosto
+                // A escrita no framebuffer 32×32 é feita via uart_wr_en_comb
+                // (assign combinacional) que já cuida da escrita imediata.
+                // =====================================================
+                ST_RX_FACE: begin
+                    // uart_wr_en_comb cuida da escrita e do incremento de uart_wr_addr
+                    // Quando uart_frame_pending é setado (byte 1023 escrito), voltamos para IDLE
+                    // e a inferência será disparada pelo mecanismo existente
+                    if (uart_frame_pending) begin
+                        frame_mode <= 1'b1;  // Atualiza modo para VGA
+                        state <= ST_IDLE;
+                    end
+                end
+
+                // =====================================================
+                // ST_RX_VIDEO: Recebendo 16384 bytes do frame de vídeo
+                // Escrita no framebuffer 128×128 via portas de saída
+                // =====================================================
+                ST_RX_VIDEO: begin
+                    if (uart_valid) begin
+                        video_fb_wr_en   <= 1'b1;
+                        video_fb_wr_addr <= uart_wr_addr;
+                        video_fb_wr_data <= uart_data;
+
+                        if (uart_wr_addr == 14'd16383) begin
+                            // Último byte do frame de vídeo
+                            uart_wr_addr <= 14'd0;
+                            frame_mode   <= 1'b0;  // Atualiza modo para VGA
+                            state        <= ST_IDLE;
+                        end else begin
+                            uart_wr_addr <= uart_wr_addr + 14'd1;
+                        end
+                    end
+                end
+
+                // =====================================================
+                // ST_READ: Lê o framebuffer 32×32 para alimentar a CNN
+                // =====================================================
                 ST_READ: begin
                     if (rd_req_count < 11'd1024) begin
                         fb_rd_en   <= 1'b1;
@@ -360,6 +450,9 @@ module cnn_top (
                     end
                 end
 
+                // =====================================================
+                // ST_WAIT: Aguarda conclusão da inferência CNN
+                // =====================================================
                 ST_WAIT: begin
                     fb_rd_en <= 1'b0;
                     if (dense_done) begin
@@ -367,6 +460,9 @@ module cnn_top (
                     end
                 end
 
+                // =====================================================
+                // ST_DONE: Pulsa access_done e retorna ao IDLE
+                // =====================================================
                 ST_DONE: begin
                     access_done <= 1'b1;
                     state       <= ST_IDLE;

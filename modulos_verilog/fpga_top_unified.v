@@ -71,10 +71,23 @@ module fpga_top_unified (
     wire        frame_ready;
     wire        debug_weights_nonzero;
     wire        debug_frame_nonzero;
+    wire        frame_mode;         // 0 = vídeo (128×128), 1 = rosto (32×32)
 
-    // --- Porta VGA do framebuffer (dentro do cnn_top) ---
-    wire [7:0]  vga_rd_data;        // Pixel lido do framebuffer para o VGA
+    // --- Portas de escrita do video framebuffer (geradas pelo cnn_top) ---
+    wire        video_fb_wr_en;
+    wire [13:0] video_fb_wr_addr;
+    wire [7:0]  video_fb_wr_data;
+
+    // --- Porta VGA do framebuffer 32×32 (dentro do cnn_top) ---
+    wire [7:0]  vga_rd_data;        // Pixel lido do framebuffer 32×32
     reg  [9:0]  vga_rd_addr;        // Endereço de leitura VGA (32×32 = 10 bits)
+
+    // --- Porta VGA do framebuffer 128×128 ---
+    wire [7:0]  video_vga_rd_data;  // Pixel lido do framebuffer 128×128
+    reg  [13:0] video_vga_rd_addr;  // Endereço de leitura VGA (128×128 = 14 bits)
+
+    // --- Modo de exibição VGA (latched no domínio 25 MHz) ---
+    reg         display_mode;       // 0 = vídeo 128×128, 1 = rosto 32×32
 
     // --- VGA timing ---
     wire        hsync_raw, vsync_raw, video_on_raw;
@@ -137,7 +150,8 @@ module fpga_top_unified (
     // =========================================================================
     // 5. CNN PIPELINE COMPLETO (19 classes)
     //    Recebe imagem via UART interna, processa e gera class_id.
-    //    A porta VGA do framebuffer é conectada ao barramento VGA deste módulo.
+    //    A porta VGA do framebuffer 32×32 é conectada ao barramento VGA.
+    //    As portas do video framebuffer 128×128 são roteadas ao módulo externo.
     // =========================================================================
     cnn_top cnn_inst (
         .clk           (CLOCK_50),
@@ -154,10 +168,18 @@ module fpga_top_unified (
         .fb_wr_addr    (10'd0),
         .fb_wr_data    (8'd0),
 
-        // Portas VGA do framebuffer — conectadas ao barramento VGA
+        // Portas VGA do framebuffer 32×32 — conectadas ao barramento VGA
         .vga_rd_en     (1'b1),              // Leitura contínua habilitada
         .vga_rd_addr   (vga_rd_addr),       // Endereço gerado pela lógica VGA
         .vga_rd_data   (vga_rd_data),       // Pixel para renderização
+
+        // Portas de escrita do video framebuffer 128×128
+        .video_fb_wr_en   (video_fb_wr_en),
+        .video_fb_wr_addr (video_fb_wr_addr),
+        .video_fb_wr_data (video_fb_wr_data),
+
+        // Modo do frame atual
+        .frame_mode    (frame_mode),
 
         // Saídas de resultado
         .final_result  (final_result),
@@ -167,6 +189,21 @@ module fpga_top_unified (
         .frame_ready   (frame_ready),
         .debug_weights_nonzero (debug_weights_nonzero),
         .debug_frame_nonzero   (debug_frame_nonzero)
+    );
+
+    // =========================================================================
+    // 5b. VIDEO FRAMEBUFFER 128×128 (apenas para exibição VGA)
+    // =========================================================================
+    framebuffer_128x128 video_fb_inst (
+        .clk          (CLOCK_50),
+        .rst          (reset),
+        .wr_en        (video_fb_wr_en),
+        .wr_addr      (video_fb_wr_addr),
+        .wr_data      (video_fb_wr_data),
+        .vga_rd_en    (1'b1),
+        .vga_rd_addr  (video_vga_rd_addr),
+        .vga_rd_data  (video_vga_rd_data),
+        .frame_ready  ()                   // Não utilizado
     );
 
     // =========================================================================
@@ -183,20 +220,23 @@ module fpga_top_unified (
     );
 
     // =========================================================================
-    // 7. MAPEAMENTO DE COORDENADAS — Scaling 12×: 32×32 → 384×384 centrada
+    // 7. MAPEAMENTO DE COORDENADAS — Dual mode:
+    //    Modo rosto:  32×32 × 12 = 384×384 centrada em 640×480
+    //    Modo vídeo: 128×128 × 3 = 384×384 centrada em 640×480
     // =========================================================================
-    // A imagem 32×32 é ampliada 12× = 384×384 pixels, centrada em 640×480.
+    // Offsets e span são idênticos em ambos os modos (mesma região 384×384).
     //   H_OFFSET = (640 - 384) / 2 = 128
     //   V_OFFSET = (480 - 384) / 2 = 48
-    //   fb_x = (pixel_x - 128) / 12  ≈  (pixel_x - 128) * 5462 >> 16
-    //   fb_y = (pixel_y -  48) / 12  ≈  (pixel_y -  48) * 5462 >> 16
     //
-    // Constante 5462 verificada: zero erros para 0–383 (teste exaustivo).
-    //   12 × 5462 = 65544 >> 16 = 1 ✓  |  383 × 5462 = 2091946 >> 16 = 31 ✓
+    // Modo rosto (÷12): ×5462 >> 16
+    //   Constante 5462 verificada: zero erros para 0–383.
+    //
+    // Modo vídeo (÷3): ×21845 >> 16
+    //   21845 = ceil(65536/3) → 383 × 21845 >> 16 = 127 ✓
 
     localparam H_OFFSET   = 10'd128;
     localparam V_OFFSET   = 10'd48;
-    localparam IMG_SPAN   = 10'd384;    // 32 × 12
+    localparam IMG_SPAN   = 10'd384;    // Ambos os modos usam 384×384
 
     // Sprite de texto (ROM): 256×32 posicionado abaixo da imagem
     localparam H_START_SPRITE = 10'd192;
@@ -204,31 +244,57 @@ module fpga_top_unified (
     localparam W_SPRITE       = 10'd256;
     localparam H_SPRITE       = 10'd32;
 
+    // --- Sincronização do display_mode (50 MHz → 25 MHz) ---
+    reg frame_mode_sync;
+    always @(posedge clk_25mhz or posedge reset) begin
+        if (reset) begin
+            frame_mode_sync <= 1'b0;
+            display_mode    <= 1'b0;
+        end else begin
+            frame_mode_sync <= frame_mode;
+            display_mode    <= frame_mode_sync;
+        end
+    end
+
     // --- Detecção de área da imagem ---
     wire in_image = (pixel_x >= H_OFFSET) && (pixel_x < (H_OFFSET + IMG_SPAN)) &&
                     (pixel_y >= V_OFFSET) && (pixel_y < (V_OFFSET + IMG_SPAN));
 
-    // --- Detecção de área do sprite ---
-    wire in_sprite_window = (pixel_x >= H_START_SPRITE) && (pixel_x < (H_START_SPRITE + W_SPRITE)) &&
+    // --- Detecção de área do sprite (oculto em modo vídeo) ---
+    wire in_sprite_window = display_mode &&
+                            (pixel_x >= H_START_SPRITE) && (pixel_x < (H_START_SPRITE + W_SPRITE)) &&
                             (pixel_y >= V_START_SPRITE) && (pixel_y < (V_START_SPRITE + H_SPRITE));
 
-    // --- Cálculo do endereço do framebuffer (32×32) ---
+    // --- Coordenadas locais dentro da área 384×384 ---
     wire [9:0]  local_x = pixel_x - H_OFFSET;   // 0–383 dentro da imagem
     wire [9:0]  local_y = pixel_y - V_OFFSET;    // 0–383 dentro da imagem
 
-    // Divisão por 12 via multiplicação por recíproco: ×5462 >> 16
+    // --- Modo rosto: Divisão por 12 → ×5462 >> 16 → 5 bits (0–31) ---
     wire [25:0] fb_x_full = local_x * 16'd5462;
     wire [25:0] fb_y_full = local_y * 16'd5462;
-    wire [4:0]  fb_x = fb_x_full[20:16];         // 5 bits (0–31)
-    wire [4:0]  fb_y = fb_y_full[20:16];         // 5 bits (0–31)
+    wire [4:0]  fb_x = fb_x_full[20:16];
+    wire [4:0]  fb_y = fb_y_full[20:16];
 
-    // Endereço linear no framebuffer 32×32
-    // Endereço = fb_y × 32 + fb_x  (Otimização: concatenação)
+    // --- Modo vídeo: Divisão por 3 → ×21845 >> 16 → 7 bits (0–127) ---
+    wire [25:0] vid_x_full = local_x * 16'd21845;
+    wire [25:0] vid_y_full = local_y * 16'd21845;
+    wire [6:0]  vid_x = vid_x_full[22:16];
+    wire [6:0]  vid_y = vid_y_full[22:16];
+
+    // --- Endereço linear no framebuffer 32×32 ---
     always @(*) begin
         if (in_image)
             vga_rd_addr = {fb_y, fb_x};  // 10 bits: fb_y * 32 + fb_x
         else
             vga_rd_addr = 10'd0;
+    end
+
+    // --- Endereço linear no framebuffer 128×128 ---
+    always @(*) begin
+        if (in_image)
+            video_vga_rd_addr = {vid_y, vid_x};  // 14 bits: vid_y * 128 + vid_x
+        else
+            video_vga_rd_addr = 14'd0;
     end
 
     // =========================================================================
@@ -256,7 +322,7 @@ module fpga_top_unified (
     //    latência registrada. Os sinais de controle são atrasados igualmente
     //    para manter o alinhamento de dados com a renderização.
     // =========================================================================
-    reg hs_d, vs_d, video_on_d, in_image_d, in_sprite_window_d;
+    reg hs_d, vs_d, video_on_d, in_image_d, in_sprite_window_d, display_mode_d;
 
     always @(posedge clk_25mhz or posedge reset) begin
         if (reset) begin
@@ -265,12 +331,14 @@ module fpga_top_unified (
             video_on_d         <= 1'b0;
             in_image_d         <= 1'b0;
             in_sprite_window_d <= 1'b0;
+            display_mode_d     <= 1'b0;
         end else begin
             hs_d               <= hsync_raw;
             vs_d               <= vsync_raw;
             video_on_d         <= video_on_raw;
             in_image_d         <= in_image;
             in_sprite_window_d <= in_sprite_window;
+            display_mode_d     <= display_mode;
         end
     end
 
@@ -278,11 +346,15 @@ module fpga_top_unified (
     assign VGA_VS      = vs_d;
     assign VGA_BLANK_N = video_on_d;
 
+    // --- MUX de pixel: seleciona entre framebuffer 32×32 e 128×128 ---
+    wire [7:0] pixel_data = display_mode_d ? vga_rd_data : video_vga_rd_data;
+
     // =========================================================================
     // 10. RENDERIZAÇÃO VGA — Composição final dos pixels
     // =========================================================================
     // Prioridade: fora da tela > imagem > sprite > fundo preto
     // Sprite: verde se reconhecido (access_granted), vermelho se desconhecido
+    // Sprite oculto em modo vídeo (in_sprite_window já inclui display_mode)
 
     always @(*) begin
         if (!video_on_d) begin
@@ -292,10 +364,10 @@ module fpga_top_unified (
             VGA_B = 8'd0;
         end
         else if (in_image_d) begin
-            // Área da imagem: escala de cinza do framebuffer
-            VGA_R = vga_rd_data;
-            VGA_G = vga_rd_data;
-            VGA_B = vga_rd_data;
+            // Área da imagem: escala de cinza (fonte selecionada por display_mode)
+            VGA_R = pixel_data;
+            VGA_G = pixel_data;
+            VGA_B = pixel_data;
         end
         else if (in_sprite_window_d) begin
             if (pixel_do_sprite == 1'b1) begin

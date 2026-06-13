@@ -55,9 +55,21 @@ def resolve_haar_cascade_path():
             return candidate
     return None
 
-# Resolução da imagem enviada (32×32 = 1024 bytes)
+# Resolução da imagem de rosto enviada (32×32 = 1024 bytes)
 IMG_SIZE = 32
 FRAME_BYTES = IMG_SIZE * IMG_SIZE  # 1024
+
+# Resolução da imagem de vídeo (128×128 = 16384 bytes)
+VIDEO_SIZE = 128
+VIDEO_FRAME_BYTES = VIDEO_SIZE * VIDEO_SIZE  # 16384
+
+# Bytes de controle
+CONTROL_NO_FACE = b'\x00'  # Nenhum rosto detectado (frame de vídeo)
+CONTROL_FACE    = b'\xFF'  # Rosto detectado (frame 32x32)
+
+# Cooldown após detecção de rosto (segundos)
+FACE_COOLDOWN = 2.5   # Pausa total após enviar rosto
+FACE_GRACE    = 2.5   # Período mínimo de apenas vídeo após cooldown
 
 
 def parse_args():
@@ -103,16 +115,33 @@ def parse_args():
     return parser.parse_args()
 
 
-def send_frame(ser, frame: np.ndarray):
-    """Envia um frame 32x32 (1024 bytes) via serial."""
+def send_control_byte(ser, control_byte: bytes):
+    """Envia o byte de controle antes do frame."""
+    if ser is not None:
+        ser.write(control_byte)
+        ser.flush()
+
+
+def send_frame(ser, frame: np.ndarray, expected_size=None):
+    """Envia um frame via serial. Suporta tamanhos variáveis."""
     raw_bytes = frame.astype(np.uint8).tobytes()
-    assert len(raw_bytes) == FRAME_BYTES, (
-        f"Frame deve ter {FRAME_BYTES} bytes, tem {len(raw_bytes)}"
-    )
+    if expected_size is not None:
+        assert len(raw_bytes) == expected_size, (
+            f"Frame deve ter {expected_size} bytes, tem {len(raw_bytes)}"
+        )
     if ser is not None:
         ser.write(raw_bytes)
         ser.flush()
     return raw_bytes
+
+
+def center_crop_1080(gray_frame):
+    """Recorta 1080x1080 centralizado do frame (ou o maior quadrado possível)."""
+    h, w = gray_frame.shape
+    crop_size = min(h, w, 1080)
+    y_start = (h - crop_size) // 2
+    x_start = (w - crop_size) // 2
+    return gray_frame[y_start:y_start + crop_size, x_start:x_start + crop_size]
 
 
 def quantize_to_q17(frame_u8: np.ndarray) -> np.ndarray:
@@ -270,6 +299,13 @@ def main():
     print(f"[OK] Câmera {args.camera} aberta. Transmitindo vídeo ao vivo...")
     print("[INFO] Pressione 'q' na janela de preview ou Ctrl+C no terminal para sair.")
 
+    # Estado da máquina de detecção
+    # "detecting"  → procura rostos e envia vídeo 128x128
+    # "cooldown"   → rosto enviado, pausa de FACE_COOLDOWN segundos
+    # "grace"      → após cooldown, envia apenas vídeo por FACE_GRACE segundos
+    state = "detecting"
+    state_timer = 0.0
+
     try:
         frames_enviados = 0
         t_start = time.time()
@@ -279,6 +315,8 @@ def main():
                 print("[ERRO] Falha na captura da câmera.")
                 break
 
+            now = time.time()
+
             # Converte para grayscale
             gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
 
@@ -286,33 +324,80 @@ def main():
             clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
             gray = clahe.apply(gray)
 
-            out_frame = gray
-            if face_cascade is not None:
-                roi, rect = detect_face_adaptive(gray, face_cascade)
-                if roi is not None:
-                    out_frame = roi
+            if state == "cooldown":
+                # Aguarda FACE_COOLDOWN segundos sem enviar nada
+                if now - state_timer >= FACE_COOLDOWN:
+                    state = "grace"
+                    state_timer = now
+                    print("[INFO] Cooldown encerrado. Enviando apenas vídeo (grace period)...")
+                continue
 
-            frame_32 = cv2.resize(out_frame, (IMG_SIZE, IMG_SIZE),
-                                  interpolation=cv2.INTER_AREA)
+            if state == "grace":
+                # Envia apenas vídeo 128x128 por FACE_GRACE segundos
+                if now - state_timer >= FACE_GRACE:
+                    state = "detecting"
+                    print("[INFO] Grace period encerrado. Retomando detecção de rostos.")
 
-            # Envia o frame
-            if not args.raw:
-                frame_32 = quantize_to_q17(frame_32)
-                
-            raw = send_frame(ser, frame_32)
-            frames_enviados += 1
+                # Envia frame de vídeo 128x128
+                cropped = center_crop_1080(gray)
+                frame_video = cv2.resize(cropped, (VIDEO_SIZE, VIDEO_SIZE),
+                                         interpolation=cv2.INTER_AREA)
+                if not args.raw:
+                    frame_video = quantize_to_q17(frame_video)
+                send_control_byte(ser, CONTROL_NO_FACE)
+                raw = send_frame(ser, frame_video, VIDEO_FRAME_BYTES)
+                frames_enviados += 1
+                preview_frame = frame_video
+                preview_size = VIDEO_SIZE
+
+            elif state == "detecting":
+                face_found = False
+                if face_cascade is not None:
+                    roi, rect = detect_face_adaptive(gray, face_cascade)
+                    if roi is not None:
+                        face_found = True
+
+                if face_found:
+                    # Rosto detectado → envia 32x32
+                    frame_32 = cv2.resize(roi, (IMG_SIZE, IMG_SIZE),
+                                          interpolation=cv2.INTER_AREA)
+                    if not args.raw:
+                        frame_32 = quantize_to_q17(frame_32)
+                    send_control_byte(ser, CONTROL_FACE)
+                    raw = send_frame(ser, frame_32, FRAME_BYTES)
+                    frames_enviados += 1
+                    preview_frame = frame_32
+                    preview_size = IMG_SIZE
+                    print(f"[FACE] Rosto detectado e enviado: {rect}. Entrando em cooldown...")
+                    state = "cooldown"
+                    state_timer = now
+                else:
+                    # Sem rosto → envia vídeo 128x128
+                    cropped = center_crop_1080(gray)
+                    frame_video = cv2.resize(cropped, (VIDEO_SIZE, VIDEO_SIZE),
+                                             interpolation=cv2.INTER_AREA)
+                    if not args.raw:
+                        frame_video = quantize_to_q17(frame_video)
+                    send_control_byte(ser, CONTROL_NO_FACE)
+                    raw = send_frame(ser, frame_video, VIDEO_FRAME_BYTES)
+                    frames_enviados += 1
+                    preview_frame = frame_video
+                    preview_size = VIDEO_SIZE
 
             # Preview
             if args.preview:
-                preview = cv2.resize(frame_32, (256, 256), interpolation=cv2.INTER_NEAREST)
-                cv2.imshow(f"Preview {IMG_SIZE}x{IMG_SIZE} -> FPGA", preview)
+                preview = cv2.resize(preview_frame, (256, 256), interpolation=cv2.INTER_NEAREST)
+                label = "FACE 32x32" if preview_size == IMG_SIZE else "VIDEO 128x128"
+                cv2.imshow(f"Preview ({label}) -> FPGA", preview)
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
             else:
                 # Dá um print esporádico para mostrar que está vivo
                 if frames_enviados % 30 == 0:
                     fps = frames_enviados / (time.time() - t_start)
-                    print(f"[INFO] Enviando frame {frames_enviados}... (Média: {fps:.1f} fps)")
+                    mode_str = state.upper()
+                    print(f"[INFO] Frame {frames_enviados} [{mode_str}] (Média: {fps:.1f} fps)")
+
 
     except KeyboardInterrupt:
         print("\n[INFO] Captura interrompida pelo usuário.")
