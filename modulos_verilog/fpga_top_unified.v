@@ -7,26 +7,26 @@
 //            predita via sprite de texto na parte inferior da tela.
 //
 // Comportamento do sprite de nome:
-//   - Antes/durante inferência: exibe "Desconhecido" (classe 0, vermelho)
+//   - Antes/durante inferência: exibe "Vazio" (classe 0)
 //   - Após inferência concluída:
-//       Se reconhecido (class_id 1–18) → nome da pessoa (verde)
-//       Se desconhecido (class_id 0)   → "Desconhecido" (vermelho)
-//   - Ao receber nova imagem (frame_ready): reseta para classe 0
+//       Se reconhecido (class_id 2–19) → nome da pessoa (verde)
+//       Se desconhecido (class_id 1)   → "Desconhecido" (vermelho)
+//   - Ao receber nova imagem (frame_ready): reseta para classe 0 ("Vazio")
 //
-// Mapeamento de Classes (ordem Keras):
-//   0 = Desconhecido | 1 = Igor | 2 = Joao | 3 = Jose Henrique | 4 = Julia
-//   5 = Lucio | 6 = Naira | 7 = Rafael | 8 = Samuel | 9 = Yuri
-//   10 = Anna Carol | 11 = Bruno | 12 = Diego | 13 = Eduardo | 14 = Fabio
-//   15 = Felipe | 16 = Gabriel | 17 = Horacio | 18 = Hugo
+// Mapeamento de Classes (com offset +1 após inferência):
+//   0 = Vazio | 1 = Desconhecido | 2 = Igor | 3 = Joao | 4 = Jose Henrique | 5 = Julia
+//   6 = Lucio | 7 = Naira | 8 = Rafael | 9 = Samuel | 10 = Yuri
+//   11 = Anna Carol | 12 = Bruno | 13 = Diego | 14 = Eduardo | 15 = Fabio
+//   16 = Felipe | 17 = Gabriel | 18 = Horacio | 19 = Hugo
 //
 // Controles:
 //   KEY[0] = Reset global (active-low, com Schmitt trigger na placa)
 //
 // LEDs:
-//   LEDG[4:0] = class_id latched (0–18)
+//   LEDG[4:0] = class_id latched (0–19, 0=Vazio, 1=Desconhecido, 2..19=Pessoas)
 //   LEDG[5]   = debug_frame_nonzero
 //   LEDG[6]   = inferência concluída (latched)
-//   LEDG[7]   = unknown (classe 0 predita)
+//   LEDG[7]   = unknown (classe 1 predita, internamente max_idx==0)
 //
 // Placa: DE2-115 (EP4CE115F29C7, Cyclone IV E)
 // ==============================================================================
@@ -65,7 +65,7 @@ module fpga_top_unified (
 
     // --- Saídas do cnn_top ---
     wire [15:0] final_result;
-    wire [4:0]  class_id;           // 0 = Desconhecido; 1–18 = pessoa
+    wire [4:0]  class_id;           // 0 = Vazio; 1 = Desconhecido; 2–19 = pessoa
     wire        unknown;
     wire        access_done;
     wire        frame_ready;
@@ -94,7 +94,7 @@ module fpga_top_unified (
     wire [9:0]  pixel_x, pixel_y;
 
     // --- Orquestrador: classe exibida no sprite ---
-    reg  [4:0]  display_class_id;   // Classe atualmente exibida (0 = Desconhecido)
+    reg  [4:0]  display_class_id;   // Classe atualmente exibida (0 = Vazio)
     wire        access_granted;     // Cor do sprite: verde (reconhecido) ou vermelho
 
     // =========================================================================
@@ -396,16 +396,16 @@ module fpga_top_unified (
     // Lógica central de integração CNN ↔ VGA.
     //
     // Regras:
-    //   - No reset: display_class_id = 0 ("Desconhecido")
+    //   - No reset: display_class_id = 0 ("Vazio")
     //   - Quando frame_ready pulsa (nova imagem completa, inferência prestes
-    //     a iniciar): display_class_id volta a 0 ("Desconhecido")
+    //     a iniciar): display_class_id volta a 0 ("Vazio")
     //   - Quando access_done pulsa (inferência concluída): display_class_id
     //     captura o class_id da CNN
-    //   - access_granted é derivado automaticamente: 1 se reconhecido (≠0)
+    //   - access_granted é derivado automaticamente: 1 se reconhecido (>1)
     //
     // O registrador mantém o último resultado até nova imagem ser recebida.
 
-    assign access_granted = (display_class_id != 5'd0);
+    assign access_granted = (display_class_id > 5'd1);
 
     always @(posedge CLOCK_50 or posedge reset) begin
         if (reset) begin

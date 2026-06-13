@@ -8,11 +8,11 @@
 //            O primeiro byte recebido é sempre o byte de controle.
 //            Após o byte de controle, os bytes do frame seguem sequencialmente.
 //
-// Mapeamento de Classes (ordem Keras — string sort das pastas do dataset):
-//   0 = Desconhecido | 1 = Igor | 2 = Joao | 3 = Jose Henrique | 4 = Julia
-//   5 = Lucio | 6 = Naira | 7 = Rafael | 8 = Samuel | 9 = Yuri
-//   10 = Anna Carol | 11 = Bruno | 12 = Diego | 13 = Eduardo | 14 = Fabio
-//   15 = Felipe | 16 = Gabriel | 17 = Horacio | 18 = Hugo
+// Mapeamento de Classes (com offset +1 na saída após inferência):
+//   0 = Vazio | 1 = Desconhecido | 2 = Igor | 3 = Joao | 4 = Jose Henrique | 5 = Julia
+//   6 = Lucio | 7 = Naira | 8 = Rafael | 9 = Samuel | 10 = Yuri
+//   11 = Anna Carol | 12 = Bruno | 13 = Diego | 14 = Eduardo | 15 = Fabio
+//   16 = Felipe | 17 = Gabriel | 18 = Horacio | 19 = Hugo
 // ==============================================================================
 module cnn_top (
     input wire clk,
@@ -51,8 +51,8 @@ module cnn_top (
     output reg         frame_mode,
 
     output wire [15:0] final_result,
-    output wire [4:0]  class_id,       // 0 = Desconhecido; 1-18 = pessoa identificada
-    output wire        unknown,        // 1 quando class_id == 0 (rede prediz desconhecido)
+    output wire [4:0]  class_id,       // 0 = Vazio; 1 = Desconhecido; 2-19 = pessoa identificada
+    output wire        unknown,        // 1 quando class_id == 1 (rede prediz desconhecido)
     output reg         access_done,
     output wire        frame_ready,
     output wire        debug_weights_nonzero,
