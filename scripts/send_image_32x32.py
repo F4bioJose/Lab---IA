@@ -185,7 +185,7 @@ def detect_face_adaptive(gray_frame, face_cascade):
     Detecção adaptativa em cascata — idêntica ao preprocessor.py do treinamento.
     Retorna (roi_cropped, face_rect) ou (None, None) se nenhum rosto encontrado.
     """
-    detection_configs = [ # Mexer aqui pra alterar a sensibilidade. O primeiro 
+    detection_configs = [ # Configurações de sensibilidade (da mais restritiva à mais permissiva)
         (1.2, 7, 200), 
         (1.1, 6, 150),
         (1.1, 5, 120),

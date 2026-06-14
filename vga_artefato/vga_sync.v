@@ -1,11 +1,11 @@
 module vga_sync (
     input  wire clk,
     input  wire rst,          
-    output wire hsync,        // Mudado de reg para wire
-    output wire vsync,        // Mudado de reg para wire
-    output wire [9:0] pixel_x, // Mudado de reg para wire
-    output wire [9:0] pixel_y, // Mudado de reg para wire
-    output wire video_on      // Mudado de reg para wire
+    output wire hsync,
+    output wire vsync,
+    output wire [9:0] pixel_x,
+    output wire [9:0] pixel_y,
+    output wire video_on
 );
 
     parameter H_ACTIVE = 640, H_FRONT = 16, H_SYNC = 96, H_BACK = 48, H_TOTAL = H_ACTIVE+H_FRONT+H_SYNC+H_BACK-1; 

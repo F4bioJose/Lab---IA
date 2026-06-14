@@ -23,10 +23,8 @@
 //   KEY[0] = Reset global (active-low, com Schmitt trigger na placa)
 //
 // LEDs:
-//   LEDG[4:0] = class_id latched (0–19, 0=Vazio, 1=Desconhecido, 2..19=Pessoas)
-//   LEDG[5]   = debug_frame_nonzero
-//   LEDG[6]   = inferência concluída (latched)
-//   LEDG[7]   = unknown (classe 1 predita, internamente max_idx==0)
+//   LEDG0 = Acende se a classe predita for reconhecida (aprovada)
+//   LEDR0 = Acende se a classe predita for desconhecida
 //
 // Placa: DE2-115 (EP4CE115F29C7, Cyclone IV E)
 // ==============================================================================
@@ -50,8 +48,9 @@ module fpga_top_unified (
     output reg  [7:0]  VGA_G,
     output reg  [7:0]  VGA_B,
 
-    // LEDs Verdes (resultado da classificação)
-    output reg  [7:0]  LEDG
+    // LEDs (resultado da classificação)
+    output reg LEDG0,
+    output reg LEDR0
 );
 
     // =========================================================================
@@ -411,7 +410,7 @@ module fpga_top_unified (
         if (reset) begin
             display_class_id <= 5'd0;
         end else begin
-            // Ao receber nova imagem completa: reseta para "Desconhecido"
+            // Ao receber nova imagem completa: reseta para "Vazio"
             // (frame_ready pulsa brevemente quando o 1024° byte é escrito)
             if (frame_ready) begin
                 display_class_id <= 5'd0;
@@ -429,24 +428,34 @@ module fpga_top_unified (
     // =========================================================================
     // 12. LATCH DOS LEDs — Mantém o resultado visível após a inferência
     // =========================================================================
-    // Idêntico ao comportamento original do fpga_top_de2115.v.
     // Os sinais class_id/unknown do cnn_top são válidos durante o pulso
-    // de access_done (1 ciclo). Este bloco captura e retém os valores
-    // nos LEDs até o próximo reset ou nova inferência.
+    // de access_done (1 ciclo). Este bloco liga o LED verde 0 se
+    // acesso concedido e o LED vermelho 0 se desconhecido.
 
     always @(posedge CLOCK_50 or posedge reset) begin
         if (reset) begin
-            LEDG <= 8'd0;
+            LEDG0 <= 1'b0;
+            LEDR0 <= 1'b0;
         end else begin
             if (access_done) begin
-                LEDG[4:0] <= class_id;
-                LEDG[5]   <= debug_frame_nonzero;
-                LEDG[6]   <= 1'b1;              // Inferência concluída
-                LEDG[7]   <= unknown;
+                if (class_id > 5'd1) begin
+                    // Reconhecido (aprovada)
+                    LEDG0 <= 1'b1;
+                    LEDR0 <= 1'b0;
+                end else if (class_id == 5'd1) begin
+                    // Desconhecido
+                    LEDG0 <= 1'b0;
+                    LEDR0 <= 1'b1;
+                end else begin
+                    // Vazio
+                    LEDG0 <= 1'b0;
+                    LEDR0 <= 1'b0;
+                end
             end
-            // Apaga LEDG[6] quando novo frame começa
+            // Apaga os LEDs quando novo frame começa
             if (frame_ready && !access_done) begin
-                LEDG[6] <= 1'b0;
+                LEDG0 <= 1'b0;
+                LEDR0 <= 1'b0;
             end
         end
     end

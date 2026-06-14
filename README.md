@@ -1,132 +1,176 @@
-# Sistema Integrado: Fechadura Biométrica (CNN + VGA) em FPGA
+# Sistema de Classificação Facial com CNN em FPGA
 
-Implementação em hardware de uma Rede Neural Convolucional (CNN) unificada a um pipeline de vídeo VGA, sintetizada na FPGA **DE2-115 (Cyclone IV EP4CE115F29C7)** para classificação biométrica facial em tempo real. 
-
-O sistema recebe um fluxo de vídeo contínuo via UART, exibe a imagem no monitor VGA em tempo real (ampliada com supersampling) e executa a inferência na CNN em hardware dedicado. O resultado da inferência determina qual sprite de nome será renderizado no monitor e também é refletido nos LEDs da placa.
+Implementação em hardware de uma Rede Neural Convolucional (CNN) com 19 classes, sintetizada na FPGA **DE2-115 (Cyclone IV EP4CE115F29C7)**. O sistema recebe imagens de uma webcam via UART, exibe a imagem no monitor VGA em tempo real e executa a inferência em lógica digital dedicada. O resultado da classificação é exibido na tela como um sprite de texto e sinalizado nos LEDs da placa.
 
 ---
 
-## 🏗️ Arquitetura do Sistema Unificado
+## Arquitetura
 
-O projeto funde dois pipelines anteriormente separados: o fluxo da rede neural (19 classes) e a renderização gráfica via VGA. O orquestrador central garante que a imagem do framebuffer seja compartilhada entre a CNN e o VGA.
+O projeto é composto por dois pipelines que compartilham o mesmo framebuffer de imagem:
+
+- **Pipeline CNN (50 MHz):** Recebe a imagem, processa as camadas da rede neural (convolução, max pooling, camada densa) e identifica a classe.
+- **Pipeline VGA (25 MHz):** Lê a mesma imagem do framebuffer e a renderiza no monitor, junto com um sprite de texto contendo o nome da classe predita.
 
 ```
-PC (Python OpenCV)  ──[UART 115200 baud]──►  FPGA DE2-115
-                                                  │
-                                          uart_rx (32×32)
-                                                  │
-                                         Framebuffer M9K ◄─── (KEY[0] limpa memória)
-                                                  │
-                ┌─────────────────────────────────┴─────────────────────────────────┐
-                ▼                                                                   ▼
-       Pipeline CNN (50 MHz)                                             Pipeline VGA (25 MHz)
-   Line Buffer → Conv 3×3 (ReLU)                                   vga_sync gera pixels 640×480
-                │                                                                   │
-         Max Pooling 2×2                                         Lê do framebuffer com scaling 12×
-                │                                                 (Exibe 384×384 no centro da tela)
-          Flatten (900)                                                             │
-                │                                                    Acessa ROM de Sprites de Nomes
-        Dense 900×19 classes                                                        │
-                │                                                 Mistura: Imagem + Sprite + Fundo
-           Argmax Puro                                                              │
-                │                                                                   ▼
-         class_id[4:0] ────────────────FSM Orquestradora─────────────────────► Monitor VGA
+PC (Python + OpenCV)  ──[UART 2 Mbaud]──►  FPGA DE2-115
+                                                │
+                                          Byte de controle
+                                           ┌────┴────┐
+                                           ▼         ▼
+                                     Rosto 32×32   Vídeo 128×128
+                                           │         │
+                                    framebuffer   framebuffer
+                                      32×32        128×128
+                                           │         │
+                   ┌───────────────────────┴─┐       │
+                   ▼                         ▼       ▼
+          Pipeline CNN (50 MHz)     Pipeline VGA (25 MHz)
+       Line Buffer → Conv 3×3      vga_sync → pixel_x, pixel_y
+                  │                              │
+           Max Pooling 2×2          Escalonamento (12× ou 3×)
+                  │                              │
+            Flatten (900)            ROM de Sprites de Nomes
+                  │                              │
+          Dense 900×19              Composição: Imagem + Sprite
+                  │                              │
+             Argmax 19                           ▼
+                  │                       Monitor VGA
+           class_id[4:0] ──► FSM Orquestradora ──┘
 ```
 
-### Comportamento da FSM Orquestradora
-- **Reset / Sem Rosto:** O framebuffer é apagado e o sprite exibe "Desconhecido" na cor vermelha.
-- **Recebendo Imagem:** A imagem é exibida ao vivo no monitor.
-- **Inferência Concluída:** A CNN sinaliza a FSM, que captura o `class_id` gerado. O sprite de texto no monitor atualiza para exibir o nome da pessoa na cor verde (se membro autorizado) ou "Desconhecido" em vermelho (se não reconhecido).
+### Fluxo de Operação
+
+1. O script Python captura um frame da webcam e tenta detectar um rosto via Haarcascade.
+2. Se um rosto é detectado, envia o byte de controle `0xFF` seguido de 1024 bytes (imagem 32×32 em escala de cinza, quantizada em Q1.7). Se não detecta rosto, envia `0x00` seguido de 16384 bytes (imagem 128×128 para exibição apenas).
+3. A FPGA armazena a imagem no framebuffer correspondente. O VGA lê continuamente e exibe a imagem ampliada (12× para rosto, 3× para vídeo) centrada no monitor (384×384 pixels na região central de 640×480).
+4. Para frames de rosto, o pipeline CNN processa automaticamente: convolução com 4 filtros 3×3, max pooling 2×2, camada densa 900→19 e argmax.
+5. O `class_id` resultante determina qual sprite de nome aparece na parte inferior da tela (verde para pessoa reconhecida, vermelho para desconhecido) e qual LED acende.
 
 ---
 
-## 👥 Classes (Membros Cadastrados)
+## Classes
 
-A rede foi treinada com 19 classes. A Classe 0 representa uma pessoa "Desconhecida" ou "Acesso Negado". As classes de 1 a 18 representam membros autorizados.
+A rede foi treinada com 19 neurônios de saída. O neurônio 0 representa "Desconhecido". Na saída do módulo `argmax_19`, soma-se 1 ao índice, de modo que `class_id = 0` fica reservado para indicar que nenhuma inferência foi realizada ("Vazio").
 
-| ID | Nome | ID | Nome | ID | Nome |
-|----|------|----|------|----|------|
-| 0 | **Desconhecido** | 7 | Rafael | 14 | Fabio |
-| 1 | Igor | 8 | Samuel | 15 | Felipe |
-| 2 | Joao | 9 | Yuri | 16 | Gabriel |
-| 3 | Jose Henrique | 10 | Anna Carol | 17 | Horacio |
-| 4 | Julia | 11 | Bruno | 18 | Hugo |
-| 5 | Lucio | 12 | Diego | | |
-| 6 | Naira | 13 | Eduardo | | |
+| class_id | Nome | class_id | Nome | class_id | Nome |
+|----------|------|----------|------|----------|------|
+| 0 | Vazio | 7 | Naira | 14 | Eduardo |
+| 1 | **Desconhecido** | 8 | Rafael | 15 | Fabio |
+| 2 | Igor | 9 | Samuel | 16 | Felipe |
+| 3 | Joao | 10 | Yuri | 17 | Gabriel |
+| 4 | Jose Henrique | 11 | Anna Carol | 18 | Horacio |
+| 5 | Julia | 12 | Bruno | 19 | Hugo |
+| 6 | Lucio | 13 | Diego | | |
 
 ---
 
-## 📂 Estrutura de Arquivos
+## Estrutura de Arquivos
 
 ```
 Lab---IA/
-├── haarcascade_frontalface_default.xml  ← Algoritmo de detecção facial
-├── modulos_verilog/
-│   ├── fpga_top_unified.v       ← Top-level principal (Orquestrador CNN + VGA)
-│   ├── framebuffer_32x32.v      ← BRAM dual-port com lógica de hardware clear
-│   ├── cnn_top.v                ← Top-level e FSM do pipeline da CNN
-│   ├── uart_rx.v                ← Receptor UART
-│   └── (outros módulos da CNN: conv, pooling, dense, flatten, argmax)
-├── vga_artefato/
-│   ├── vga_sync.v               ← Temporizador de sync 640x480 do VGA
-│   ├── rom_sprites.v            ← ROM contendo os 19 sprites de nomes
-│   └── vga_pll.v                ← Gerador de clock 25MHz para o VGA
-├── quartus_cnn/                 
-│   ├── cnn_inference.qpf        ← Projeto Quartus unificado
-│   └── cnn_inference.qsf        ← Pin assignments (VGA + UART + LEDs)
-└── scripts/
-    └── send_image_32x32.py      ← Script Python de transmissão de vídeo ao vivo
+├── README.md                               ← Este arquivo
+├── haarcascade_frontalface_default.xml      ← Classificador Haar para detecção de rostos
+│
+├── modulos_verilog/                         ← Módulos Verilog do pipeline CNN + orquestrador
+│   ├── fpga_top_unified.v                   ← Top-level (une CNN e VGA)
+│   ├── cnn_top.v                            ← Orquestrador e FSM do pipeline CNN
+│   ├── uart_rx.v                            ← Receptor UART
+│   ├── framebuffer_32x32.v                  ← BRAM dual-port para rosto (1024 bytes)
+│   ├── framebuffer_128x128.v                ← BRAM para vídeo (16384 bytes)
+│   ├── line_buffer_32x32.v                  ← Buffer de linhas para janelamento 3×3
+│   ├── convolucao_mac.v                     ← 4 filtros convolucionais + ReLU
+│   ├── max_pooling_design.v                 ← Max pooling 2×2 com FIFO
+│   ├── flatten.v                            ← Serialização dos mapas de características
+│   ├── dense_900x19.v                       ← Camada fully-connected (900→19)
+│   ├── argmax_19.v                          ← Seleção da classe com maior score
+│   ├── weights_shared_rom.v                 ← ROM de pesos com bootloader de hardware
+│   └── weights_all.mif                      ← Pesos quantizados (INT8, 17159 bytes)
+│
+├── vga_artefato/                            ← Módulos VGA (IPs Altera + gerador de timing)
+│   ├── vga_pll.v                            ← PLL: 50 MHz → 25 MHz (IP MegaWizard)
+│   ├── vga_sync.v                           ← Gerador de temporização 640×480 @ 60 Hz
+│   ├── rom_sprites.v                        ← ROM de sprites de nomes (IP altsyncram)
+│   ├── rom_sprites.mif                      ← Bitmaps dos 20 nomes (163840 pixels)
+│   ├── vga_pll.qip, vga_pll.ppf             ← Arquivos auxiliares do IP PLL
+│   └── rom_sprites.qip                      ← Arquivo auxiliar do IP ROM
+│
+├── quartus_cnn/                             ← Projeto Quartus Prime
+│   ├── cnn_inference.qpf                    ← Manifesto do projeto
+│   ├── cnn_inference.qsf                    ← Pin assignments e configurações
+│   ├── cnn_inference.sdc                    ← Constraints de timing
+│   └── (db/, incremental_db/, output_files/) ← Pastas geradas pelo compilador
+│
+├── scripts/                                 ← Software do computador host
+│   └── send_image_32x32.py                  ← Captura de vídeo + envio UART
+│
+└── explicacoes/                             ← Documentação técnica detalhada
+    ├── modulos_verilog.md                   ← Descrição de cada módulo Verilog (principal)
+    ├── vga_artefato.md                      ← Descrição dos módulos VGA
+    ├── quartus_cnn.md                       ← Configuração de síntese e constraints
+    ├── scripts.md                           ← Documentação do script Python
+    └── maquinas_de_estado.md                ← Diagramas de todas as FSMs
 ```
 
 ---
 
-## 🚀 Como Executar
+## Como Executar
 
 ### 1. Síntese e Gravação na Placa
 
 1. Abra o Quartus Prime (versão 18.1 ou superior).
 2. Vá em **File → Open Project** e selecione `quartus_cnn/cnn_inference.qpf`.
 3. Compile o projeto: **Processing → Start Compilation** (`Ctrl+L`).
-4. Conecte a placa DE2-115 via USB Blaster.
-5. Programe via JTAG: **Tools → Programmer → Start** selecionando o arquivo `.sof`.
-6. Conecte um cabo serial (RS-232) na porta apropriada da DE2-115.
+4. Conecte a placa DE2-115 ao computador via USB Blaster.
+5. Programe via JTAG: **Tools → Programmer → Start**, selecionando o arquivo `.sof` em `output_files/`.
+6. Conecte um cabo serial (RS-232) à porta da DE2-115.
 7. Conecte o cabo VGA da DE2-115 ao monitor.
 
-### 2. Transmissão de Vídeo (Python)
+### 2. Envio de Vídeo (Python)
 
-Instale as dependências no computador host:
+Instale as dependências:
 ```bash
 pip install opencv-python pyserial numpy
 ```
 
-Rode o script de envio com a opção de preview ativada para iniciar a captura contínua da webcam:
+Inicie a captura da webcam com preview:
 ```bash
 python scripts/send_image_32x32.py --port /dev/ttyUSB0 --preview
 ```
 
-**Parâmetros suportados:**
-- `--port /dev/ttyUSB0` : Porta serial (mude para `COM3`, etc no Windows).
-- `--preview` : Abre uma janela no PC mostrando a visão da câmera.
-- `--camera 0` : Índice da câmera a ser usada (padrão é 0).
-- `--file imagem.jpg` : Envia uma imagem estática ao invés do feed da webcam.
+**Parâmetros:**
+| Parâmetro | Descrição |
+|-----------|-----------|
+| `--port` | Porta serial (`/dev/ttyUSB0` no Linux, `COM3` no Windows) |
+| `--baud` | Baud rate (padrão: 2000000) |
+| `--preview` | Exibe janela de preview no PC |
+| `--camera 0` | Índice da câmera |
+| `--file imagem.jpg` | Envia imagem estática em vez da webcam |
+| `--mock` | Testa sem a placa conectada |
 
-Pressione a tecla `q` na janela de preview ou `Ctrl+C` no terminal para encerrar a transmissão.
+No modo preview, pressione **ESPAÇO** para ativar/pausar a detecção de rostos e **Q** para encerrar.
 
 ---
 
-## 🎛️ Controles na Placa (Hardware)
+## Controles na Placa
 
 | Componente | Função |
-|------------|--------|
-| **KEY[0]** | **Reset do Sistema / Apagar Monitor:** Pressionar este botão limpa ativamente toda a memória do Framebuffer e força a FSM a reiniciar. A tela do monitor VGA ficará preta imediatamente e o sprite voltará a exibir "Desconhecido". |
-| **LEDG[4:0]** | `class_id`: Exibe a classe predita em binário (0 = Desconhecido; 1–18 = membro autorizado). Mantém o valor salvo (latched) até a próxima inferência. |
-| **LEDG[5]** | Debug: Aceso se a imagem recebida conter pixels não-nulos. |
-| **LEDG[6]** | `done`: Aceso enquanto a última inferência estiver concluída com sucesso. Apaga brevemente ao receber um novo frame. |
-| **LEDG[7]** | `unknown`: Aceso caso a CNN não reconheça o rosto da pessoa (classe 0 predita). |
+|-----------|--------|
+| **KEY[0]** | Reset do sistema. Apaga os framebuffers, reinicia a FSM e a tela VGA fica preta. |
+| **LEDG[0]** | Acende quando a última classe predita é uma pessoa reconhecida (class_id 2–19). |
+| **LEDR[0]** | Acende quando a última classe predita é "Desconhecido" (class_id 1). |
+
+Os LEDs apagam automaticamente quando um novo frame começa a ser recebido.
 
 ---
 
-## 📚 Documentação Técnica Avançada
+## Documentação Técnica
 
-Para um aprofundamento extremo em todos os aspectos arquiteturais do projeto (Análise das camadas neurais, explicação do conversor OpenCV em Python, formatos matemáticos Q1.7, constrições do Quartus e Diagramas de Máquina de Estado), acesse:
-👉 **[Documentação Detalhada do Sistema](file:///mnt/Data/Lab---IA/explicacoes/documentacao_detalhada.md)**
+A pasta `explicacoes/` contém a documentação detalhada do projeto, organizada por área:
+
+| Documento | Conteúdo |
+|-----------|----------|
+| [modulos_verilog.md](explicacoes/modulos_verilog.md) | **Documento principal.** Hierarquia de instanciação e descrição de cada módulo Verilog. |
+| [vga_artefato.md](explicacoes/vga_artefato.md) | PLL, gerador de temporização VGA e ROM de sprites. |
+| [quartus_cnn.md](explicacoes/quartus_cnn.md) | Pin assignments, padrões elétricos e constraints de timing. |
+| [scripts.md](explicacoes/scripts.md) | Script Python: pipeline de imagem, protocolo UART e detecção de rostos. |
+| [maquinas_de_estado.md](explicacoes/maquinas_de_estado.md) | Diagramas e tabelas de transição de todas as FSMs do projeto. |

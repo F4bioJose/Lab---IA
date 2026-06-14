@@ -18,7 +18,8 @@ set_false_path -from [get_ports UART_RXD]
 set_false_path -from [get_ports KEY]
 
 # LEDs são saídas lentas — relaxar constraints
-set_false_path -to [get_ports LEDG*]
+set_false_path -to [get_ports LEDG0]
+set_false_path -to [get_ports LEDR0]
 
 # VGA: saídas são amostradas pelo DAC na borda do VGA_CLK (gerado pelo FPGA).
 # Como o VGA_CLK é gerado por DDR a partir do mesmo PLL, as saídas VGA_R/G/B

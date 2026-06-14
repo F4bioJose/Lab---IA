@@ -21,12 +21,9 @@ module framebuffer_32x32 (
     input wire [9:0] rd_addr,
     output reg [7:0] rd_data,
 
-    // ==========================================
     // [PONTO DE SAÍDA PARA O CONTROLADOR VGA]
-    // O Controlador de Vídeo solicitará a leitura dos endereços em 60Hz
-    // através destas portas para desenhar a face na tela paralelamente à CNN.
-    // (Na fase de Integração Final, este módulo todo será substituído pela SRAM Externa)
-    // ==========================================
+    // O controlador de vídeo solicita a leitura dos endereços em 60 Hz
+    // através destas portas para desenhar a imagem na tela paralelamente à CNN.
     input wire vga_rd_en,
     input wire [9:0] vga_rd_addr,
     output reg [7:0] vga_rd_data,

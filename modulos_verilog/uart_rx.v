@@ -81,7 +81,7 @@ module uart_rx #(
                     // Espera terminar o Stop Bit
                     if (clock_count == CYCLES_PER_BIT - 1) begin
                         data_out <= shift_reg; // Transfere o byte completo para a saida
-                        data_valid <= 1'b1;    // PRO FRAME BUFFER: PIXEL PRONTO
+                        data_valid <= 1'b1;    // Byte completo disponível em data_out
                         state <= IDLE;
                     end else begin
                         clock_count <= clock_count + 16'd1;
