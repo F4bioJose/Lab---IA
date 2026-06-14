@@ -69,9 +69,7 @@ module cnn_top (
     reg uart_start_pulse;
     reg uart_frame_pending;
 
-    // Modo do frame sendo recebido atualmente via UART
-    // 0 = vídeo (128×128), 1 = rosto (32×32)
-    reg current_frame_mode;
+    // O modo atual é gerenciado diretamente pela FSM (ST_RX_FACE e ST_RX_VIDEO)
 
     // Sinal combinacional para escrita imediata no framebuffer 32×32
     // Só ativo quando estamos recebendo um frame de rosto (mode=1)
@@ -302,7 +300,6 @@ module cnn_top (
             uart_wr_addr       <= 14'd0;
             uart_start_pulse   <= 1'b0;
             uart_frame_pending <= 1'b0;
-            current_frame_mode <= 1'b0;
             frame_mode         <= 1'b0;
             state              <= ST_IDLE;
             fb_rd_en           <= 1'b0;
@@ -386,11 +383,9 @@ module cnn_top (
                         uart_wr_addr <= 14'd0;
                         if (uart_data == 8'hFF) begin
                             // Byte de controle: rosto (32×32)
-                            current_frame_mode <= 1'b1;
                             state <= ST_RX_FACE;
                         end else begin
                             // Byte de controle: vídeo (128×128) — qualquer valor ≠ 0xFF
-                            current_frame_mode <= 1'b0;
                             state <= ST_RX_VIDEO;
                         end
                     end
@@ -455,7 +450,7 @@ module cnn_top (
                 // =====================================================
                 ST_WAIT: begin
                     fb_rd_en <= 1'b0;
-                    if (dense_done) begin
+                    if (argmax_valid) begin
                         state <= ST_DONE;
                     end
                 end

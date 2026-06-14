@@ -302,8 +302,10 @@ module fpga_top_unified (
     // Cada classe ocupa um slot de 256×32 = 8192 pixels (1 bit/pixel) na ROM.
     // Endereço = {display_class_id, 13'd0} + (sprite_y × 256 + sprite_x)
 
-    wire [7:0]  sprite_x = (pixel_x - H_START_SPRITE);  // 0–255
-    wire [4:0]  sprite_y = (pixel_y - V_START_SPRITE);   // 0–31
+    wire [9:0]  sprite_x_full = (pixel_x - H_START_SPRITE);
+    wire [9:0]  sprite_y_full = (pixel_y - V_START_SPRITE);
+    wire [7:0]  sprite_x = sprite_x_full[7:0];  // 0–255
+    wire [4:0]  sprite_y = sprite_y_full[4:0];   // 0–31
     wire [12:0] pixel_atual_offset = (sprite_y * 10'd256) + sprite_x;
     wire [17:0] endereco_base_aluno = {display_class_id, 13'd0};
     wire [17:0] endereco_mega_rom = endereco_base_aluno + pixel_atual_offset;
@@ -414,6 +416,9 @@ module fpga_top_unified (
             // (frame_ready pulsa brevemente quando o 1024° byte é escrito)
             if (frame_ready) begin
                 display_class_id <= 5'd0;
+            end else if (frame_mode == 1'b0) begin
+                // Limpa o sprite de nome se voltamos a transmitir apenas vídeo
+                display_class_id <= 5'd0;
             end
 
             // Ao concluir a inferência: captura o resultado da CNN
@@ -452,8 +457,8 @@ module fpga_top_unified (
                     LEDR0 <= 1'b0;
                 end
             end
-            // Apaga os LEDs quando novo frame começa
-            if (frame_ready && !access_done) begin
+            // Apaga os LEDs quando novo frame de rosto começa ou quando volta ao vídeo
+            if ((frame_ready && !access_done) || frame_mode == 1'b0) begin
                 LEDG0 <= 1'b0;
                 LEDR0 <= 1'b0;
             end

@@ -49,54 +49,63 @@ module argmax_19 (
 
     reg signed [15:0] max_val;
     reg [4:0]         max_idx;
+    reg [4:0]         current_idx;
+    reg [1:0]         state;
 
-    // -------------------------------------------------------------------------
-    // Busca do argmax: comparação em cascata explícita das 19 classes.
-    // A cada pulso valid_in os 19 scores são comparados em paralelo/sequência.
-    // -------------------------------------------------------------------------
+    localparam IDLE      = 2'd0;
+    localparam COMPARING = 2'd1;
+    localparam DONE      = 2'd2;
+
     always @(posedge clk or posedge rst) begin
         if (rst) begin
-            valid_out <= 1'b0;
-            class_id  <= 5'd0; // Inicializa como Vazio
-            unknown   <= 1'b0;
-            max_score <= 16'sd0;
+            valid_out   <= 1'b0;
+            class_id    <= 5'd0; // Inicializa como Vazio
+            unknown     <= 1'b0;
+            max_score   <= 16'sd0;
+            max_val     <= 16'sd0;
+            max_idx     <= 5'd0;
+            current_idx <= 5'd0;
+            state       <= IDLE;
         end else begin
-            valid_out <= 1'b0;
+            valid_out <= 1'b0; // Pulso único por default
 
-            if (valid_in) begin
-                // Inicializa com a classe 0
-                max_val = scores[0];
-                max_idx = 5'd0;
+            case (state)
+                IDLE: begin
+                    if (valid_in) begin
+                        max_val     <= scores[0];
+                        max_idx     <= 5'd0;
+                        current_idx <= 5'd1;
+                        state       <= COMPARING;
+                    end
+                end
 
-                // Comparações explícitas, classe a classe (1..18)
-                if (scores[ 1] > max_val) begin max_val = scores[ 1]; max_idx = 5'd1;  end
-                if (scores[ 2] > max_val) begin max_val = scores[ 2]; max_idx = 5'd2;  end
-                if (scores[ 3] > max_val) begin max_val = scores[ 3]; max_idx = 5'd3;  end
-                if (scores[ 4] > max_val) begin max_val = scores[ 4]; max_idx = 5'd4;  end
-                if (scores[ 5] > max_val) begin max_val = scores[ 5]; max_idx = 5'd5;  end
-                if (scores[ 6] > max_val) begin max_val = scores[ 6]; max_idx = 5'd6;  end
-                if (scores[ 7] > max_val) begin max_val = scores[ 7]; max_idx = 5'd7;  end
-                if (scores[ 8] > max_val) begin max_val = scores[ 8]; max_idx = 5'd8;  end
-                if (scores[ 9] > max_val) begin max_val = scores[ 9]; max_idx = 5'd9;  end
-                if (scores[10] > max_val) begin max_val = scores[10]; max_idx = 5'd10; end
-                if (scores[11] > max_val) begin max_val = scores[11]; max_idx = 5'd11; end
-                if (scores[12] > max_val) begin max_val = scores[12]; max_idx = 5'd12; end
-                if (scores[13] > max_val) begin max_val = scores[13]; max_idx = 5'd13; end
-                if (scores[14] > max_val) begin max_val = scores[14]; max_idx = 5'd14; end
-                if (scores[15] > max_val) begin max_val = scores[15]; max_idx = 5'd15; end
-                if (scores[16] > max_val) begin max_val = scores[16]; max_idx = 5'd16; end
-                if (scores[17] > max_val) begin max_val = scores[17]; max_idx = 5'd17; end
-                if (scores[18] > max_val) begin max_val = scores[18]; max_idx = 5'd18; end
+                COMPARING: begin
+                    if (scores[current_idx] > max_val) begin
+                        max_val <= scores[current_idx];
+                        max_idx <= current_idx;
+                    end
+                    
+                    if (current_idx == 5'd18) begin
+                        state <= DONE;
+                    end else begin
+                        current_idx <= current_idx + 5'd1;
+                    end
+                end
 
-                max_score <= max_val;
-                class_id  <= max_idx + 5'd1;
-
-                // Desconhecido: a rede nativa treinou a classe 0 como "Desconhecido"
-                // Não há threshold — a decisão é puramente pelo argmax
-                unknown <= (max_idx == 5'd0) ? 1'b1 : 1'b0;
-
-                valid_out <= 1'b1;
-            end
+                DONE: begin
+                    max_score <= max_val;
+                    class_id  <= max_idx + 5'd1;
+                    
+                    // Desconhecido: a rede nativa treinou a classe 0 como "Desconhecido"
+                    // Não há threshold — a decisão é puramente pelo argmax
+                    unknown <= (max_idx == 5'd0) ? 1'b1 : 1'b0;
+                    
+                    valid_out <= 1'b1;
+                    state     <= IDLE;
+                end
+                
+                default: state <= IDLE;
+            endcase
         end
     end
 

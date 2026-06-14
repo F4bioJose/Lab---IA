@@ -67,10 +67,10 @@ fpga_top_unified (top-level)
    - Fundo preto
 
 4. **Orquestração CNN ↔ VGA** — Mantém o registrador `display_class_id` que controla qual nome é exibido no sprite:
-   - No reset ou ao receber novo frame: `display_class_id = 0` (exibe "Vazio")
+   - No reset, ao receber novo frame, ou ao retornar para o modo vídeo: `display_class_id = 0` (exibe "Vazio")
    - Quando a CNN conclui a inferência: `display_class_id` recebe o `class_id` produzido
 
-5. **Controle dos LEDs** — Acende `LEDG[0]` quando a classe é reconhecida (aprovada) ou `LEDR[0]` quando é desconhecida. Ambos apagam ao iniciar um novo frame.
+5. **Controle dos LEDs** — Acende `LEDG[0]` quando a classe é reconhecida (aprovada) ou `LEDR[0]` quando é desconhecida. Ambos apagam ao iniciar um novo frame ou ao retornar para o modo vídeo.
 
 6. **Compensação de latência** — Os sinais de controle (hsync, vsync, video_on, in_image, in_sprite_window) são atrasados em 1 ciclo de clock para alinhar com a latência de leitura das memórias BRAM e da ROM de sprites.
 
@@ -328,13 +328,15 @@ As etapas de precisão são:
 
 **Finalidade:** Recebe os 19 scores produzidos pela camada densa e identifica qual classe possui a maior pontuação (argmax). Também sinaliza se a classe predita é "Desconhecido".
 
-**Funcionamento:**
+**Funcionamento (FSM Sequencial):**
 
-Quando `valid_in` é pulsado (indicando que os 19 scores estão prontos), o módulo:
+Para respeitar as restrições de *timing* físico da FPGA, o módulo implementa uma Máquina de Estados Finitos que processa um score por ciclo de clock (total de 20 ciclos do `valid_in` ao `valid_out`).
 
-1. Inicializa `max_val = scores[0]` e `max_idx = 0`.
-2. Compara sequencialmente com cada score de 1 a 18. Se `scores[i] > max_val`, atualiza `max_val` e `max_idx`.
-3. A saída `class_id` recebe `max_idx + 1` (offset de +1 para reservar o valor 0 como "Vazio").
+Quando `valid_in` é pulsado (indicando que os 19 scores estão prontos), a FSM faz:
+
+1. **IDLE:** Ao receber o pulso, inicializa `max_val = scores[0]`, `max_idx = 0` e prepara `current_idx = 1`. Vai para `COMPARING`.
+2. **COMPARING:** A cada ciclo, compara `scores[current_idx]` com `max_val`. Atualiza o maior valor encontrado. Incrementa `current_idx`. Ao atingir a classe 18, vai para `DONE`.
+3. **DONE:** A saída `class_id` recebe `max_idx + 1` (offset de +1 para reservar o valor 0 como "Vazio"). Pulsa `valid_out` e retorna ao `IDLE`.
 
 **Mapeamento de classes (offset +1):**
 

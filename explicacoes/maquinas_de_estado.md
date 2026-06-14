@@ -62,7 +62,7 @@ stateDiagram-v2
 
     ST_READ --> ST_WAIT : rd_val_count == 1024 (framebuffer lido completamente)
 
-    ST_WAIT --> ST_DONE : dense_done (camada densa concluiu)
+    ST_WAIT --> ST_DONE : argmax_valid (cálculo de argmax concluiu)
 
     ST_DONE --> ST_IDLE : access_done pulsado
 ```
@@ -71,13 +71,13 @@ stateDiagram-v2
 
 | Estado atual | Condição | Próximo estado | Ação |
 |-------------|----------|---------------|------|
-| ST_IDLE | `uart_valid` e `uart_data == 0xFF` | ST_RX_FACE | Define `current_frame_mode = 1` (rosto) |
-| ST_IDLE | `uart_valid` e `uart_data != 0xFF` | ST_RX_VIDEO | Define `current_frame_mode = 0` (vídeo) |
+| ST_IDLE | `uart_valid` e `uart_data == 0xFF` | ST_RX_FACE | Entra no modo de recepção de Rosto |
+| ST_IDLE | `uart_valid` e `uart_data != 0xFF` | ST_RX_VIDEO | Entra no modo de recepção de Vídeo |
 | ST_IDLE | `start_system_int` e `frame_ready` e `weights_boot_done` | ST_READ | Inicia leitura do framebuffer 32×32 |
 | ST_RX_FACE | `uart_frame_pending` | ST_IDLE | `frame_mode <= 1`, frame de rosto completo |
 | ST_RX_VIDEO | `uart_wr_addr == 16383` | ST_IDLE | `frame_mode <= 0`, frame de vídeo completo |
 | ST_READ | `rd_val_count == 1024` | ST_WAIT | Todos os pixels lidos e enviados ao pipeline |
-| ST_WAIT | `dense_done` | ST_DONE | Camada densa terminou processamento |
+| ST_WAIT | `argmax_valid` | ST_DONE | argmax_19 encontrou o maior score |
 | ST_DONE | — | ST_IDLE | Pulsa `access_done` por 1 ciclo |
 
 **Fluxo de frame de rosto:** O byte de controle `0xFF` direciona a FSM para `ST_RX_FACE`, onde os próximos 1024 bytes são escritos no `framebuffer_32x32` via lógica combinacional (`uart_wr_en_comb`). Ao completar, `uart_frame_pending` é ativado, a FSM volta ao `ST_IDLE` e detecta o frame pendente, transitando para `ST_READ` para iniciar a inferência.
@@ -127,7 +127,7 @@ stateDiagram-v2
 |--------|------|-----------|
 | Reset (`rst`) | `display_class_id <= 0` | Mais alta |
 | `access_done` | `display_class_id <= class_id` | Alta |
-| `frame_ready` | `display_class_id <= 0` | Normal |
+| `frame_ready` ou `frame_mode == 0` | `display_class_id <= 0` | Normal |
 | Nenhum | Mantém valor atual | — |
 
 **Determinação da cor do sprite:** O sinal `access_granted = (display_class_id > 1)` é usado para selecionar a cor do texto:
@@ -142,7 +142,7 @@ stateDiagram-v2
 | `access_done` e `class_id > 1` | 1 | 0 |
 | `access_done` e `class_id == 1` | 0 | 1 |
 | `access_done` e `class_id == 0` | 0 | 0 |
-| `frame_ready` | 0 | 0 |
+| `frame_ready` ou `frame_mode == 0` | 0 | 0 |
 
 ---
 
@@ -216,3 +216,32 @@ stateDiagram-v2
 **Justificativa dos temporizadores:**
 - **Cooldown (2.5s):** Garante que a FPGA tenha tempo para concluir a inferência e exibir o resultado no VGA antes de receber um novo rosto.
 - **Grace period (2.5s):** Evita que o mesmo rosto seja reenviado imediatamente após o cooldown, forçando um intervalo mínimo de apenas vídeo.
+
+---
+
+## 6. FSM do `argmax_19` — Máximo Sequencial
+
+**Arquivo:** [argmax_19.v](../modulos_verilog/argmax_19.v)
+
+**Descrição:** Implementação sequencial para encontrar a maior pontuação (argmax) entre as 19 classes. Ela consome 19 ciclos de clock, poupando a FPGA de violar os limites de temporização de hardware (timing violations) que ocorreriam numa implementação 100% combinacional em 1 ciclo.
+
+```mermaid
+stateDiagram-v2
+    [*] --> IDLE
+
+    IDLE --> COMPARING : valid_in (19 scores recebidos da camada densa)
+    
+    COMPARING --> COMPARING : current_idx < 18 (compara a próxima classe)
+    COMPARING --> DONE : current_idx == 18 (todas as 19 classes comparadas)
+
+    DONE --> IDLE : pulsa valid_out
+```
+
+**Tabela de transições:**
+
+| Estado atual | Condição | Próximo estado | Ação |
+|-------------|----------|---------------|------|
+| IDLE | `valid_in` | COMPARING | `max_val <= scores[0]`, `current_idx <= 1` |
+| COMPARING | `current_idx < 18` | COMPARING | Compara `scores[current_idx]` com `max_val` |
+| COMPARING | `current_idx == 18` | DONE | Compara última classe |
+| DONE | — | IDLE | `class_id <= max_idx + 1`, pulsa `valid_out` |
