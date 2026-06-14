@@ -1,6 +1,6 @@
 module uart_rx #(
     parameter CLK_FREQ = 50000000,  // 50 MHz
-    parameter BAUD_RATE = 115200    // Velocidade de comunicacao
+    parameter BAUD_RATE = 2000000    // Velocidade de comunicacao
 )(
     input wire clk,
     input wire rst,

@@ -81,8 +81,8 @@ def parse_args():
         help="Porta serial (default: /dev/ttyUSB0)"
     )
     parser.add_argument(
-        "--baud", type=int, default=115200,
-        help="Baud rate (default: 115200, compatível com uart_rx do cnn_top)"
+        "--baud", type=int, default=2000000,
+        help="Baud rate (default: 2000000, compatível com uart_rx do cnn_top)"
     )
     parser.add_argument(
         "--camera", type=int, default=0,
@@ -185,10 +185,10 @@ def detect_face_adaptive(gray_frame, face_cascade):
     Detecção adaptativa em cascata — idêntica ao preprocessor.py do treinamento.
     Retorna (roi_cropped, face_rect) ou (None, None) se nenhum rosto encontrado.
     """
-    detection_configs = [
-        (1.2, 5, 60),
-        (1.1, 3, 40),
-        (1.05, 2, 30),
+    detection_configs = [ # Mexer aqui pra alterar a sensibilidade. O primeiro 
+        (1.2, 7, 200), 
+        (1.1, 6, 150),
+        (1.1, 5, 120),
     ]
     for sf, mn, ms in detection_configs:
         faces = face_cascade.detectMultiScale(
@@ -298,17 +298,22 @@ def main():
 
     print(f"[OK] Câmera {args.camera} aberta. Transmitindo vídeo ao vivo...")
     print("[INFO] Pressione 'q' na janela de preview ou Ctrl+C no terminal para sair.")
+    if args.preview:
+        print("[INFO] Pressione ESPAÇO na janela de preview para iniciar/pausar a IA.")
 
     # Estado da máquina de detecção
+    # "paused"     → envia apenas vídeo de fundo 128x128, aguardando ativação
     # "detecting"  → procura rostos e envia vídeo 128x128
     # "cooldown"   → rosto enviado, pausa de FACE_COOLDOWN segundos
     # "grace"      → após cooldown, envia apenas vídeo por FACE_GRACE segundos
-    state = "detecting"
+    state = "paused" if args.preview else "detecting"
     state_timer = 0.0
 
     try:
         frames_enviados = 0
         t_start = time.time()
+        print("[INFO] Aquecendo a câmera por 2 segundos...")
+        time.sleep(2)
         while True:
             ret, frame_bgr = cap.read()
             if not ret:
@@ -350,9 +355,9 @@ def main():
                 preview_frame = frame_video
                 preview_size = VIDEO_SIZE
 
-            elif state == "detecting":
+            elif state == "detecting" or state == "paused":
                 face_found = False
-                if face_cascade is not None:
+                if state == "detecting" and face_cascade is not None:
                     roi, rect = detect_face_adaptive(gray, face_cascade)
                     if roi is not None:
                         face_found = True
@@ -389,8 +394,16 @@ def main():
                 preview = cv2.resize(preview_frame, (256, 256), interpolation=cv2.INTER_NEAREST)
                 label = "FACE 32x32" if preview_size == IMG_SIZE else "VIDEO 128x128"
                 cv2.imshow(f"Preview ({label}) -> FPGA", preview)
-                if cv2.waitKey(1) & 0xFF == ord('q'):
+                key = cv2.waitKey(1) & 0xFF
+                if key == ord('q'):
                     break
+                elif key == ord(' '):
+                    if state == "paused":
+                        state = "detecting"
+                        print("\n[INFO] IA ATIVADA! Buscando rostos...\n")
+                    else:
+                        state = "paused"
+                        print("\n[INFO] IA PAUSADA. Transmitindo apenas vídeo do ambiente.\n")
             else:
                 # Dá um print esporádico para mostrar que está vivo
                 if frames_enviados % 30 == 0:

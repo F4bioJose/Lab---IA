@@ -30,24 +30,43 @@ module framebuffer_128x128 (
     // 128×128 = 16384 bytes → inferidos como M9K
     (* ramstyle = "no_rw_check, M9K" *) reg [7:0] mem [0:16383];
 
+    reg [13:0] clear_addr;
+    reg        clearing;
+
     always @(posedge clk or posedge rst) begin
         if (rst) begin
             frame_ready <= 1'b0;
+            clearing    <= 1'b1;
+            clear_addr  <= 14'd0;
         end else begin
-            if (wr_en && wr_addr == 14'd16383) begin
+            if (wr_en && wr_addr == 14'd16383 && !clearing) begin
                 frame_ready <= 1'b1;
             end
             // frame_ready stays high until next frame starts overwriting
-            if (wr_en && wr_addr == 14'd0) begin
+            if (wr_en && wr_addr == 14'd0 && !clearing) begin
                 frame_ready <= 1'b0;
+            end
+
+            // Lógica do contador de clear
+            if (clearing) begin
+                if (clear_addr == 14'd16383) begin
+                    clearing <= 1'b0;
+                end else begin
+                    clear_addr <= clear_addr + 14'd1;
+                end
             end
         end
     end
 
+    // Multiplexadores de controle de escrita para limpar ou receber UART
+    wire        actual_wr_en   = clearing | wr_en;
+    wire [13:0] actual_wr_addr = clearing ? clear_addr : wr_addr;
+    wire [7:0]  actual_wr_data = clearing ? 8'd0 : wr_data;
+
     // Bloco síncrono puro (sem reset) para inferir M9K
     always @(posedge clk) begin
-        if (wr_en) begin
-            mem[wr_addr] <= wr_data;
+        if (actual_wr_en) begin
+            mem[actual_wr_addr] <= actual_wr_data;
         end
 
         if (vga_rd_en) begin
