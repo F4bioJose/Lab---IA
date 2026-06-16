@@ -1,0 +1,14 @@
+% ---
+% RESUMOS
+% ---
+
+% resumo em português
+\setlength{\absparsep}{18pt} % ajusta o espaçamento dos parágrafos do resumo
+\begin{resumo}
+Este trabalho apresenta o desenvolvimento de uma Fechadura Biométrica Inteligente implementada na FPGA DE2-115 (Cyclone IV EP4CE115F29C7) como projeto integrador da disciplina ENGG52 da UFBA. O sistema realiza reconhecimento facial em tempo real através de uma Rede Neural Convolucional embarcada, classificando indivíduos entre X classes — 18 membros autorizados e uma classe nativa de rejeição — sem necessidade de limiar de confiança externo.
+A solução cobre o pipeline completo de ponta a ponta: uma câmera conectada ao PC captura o rosto do usuário, que é detectado pelo algoritmo Haar Cascade, normalizado com CLAHE, redimensionado para 32×32 pixels e transmitido via UART à placa. Na FPGA, uma Máquina de Estados Finitos orquestra o pipeline de inferência composto pelos módulos de convolução 3×3 com ReLU (4 filtros), Max Pooling 2×2, Flatten e camada Densa 900×19, cujos pesos foram treinados em Python com Keras, quantizados para o formato de ponto fixo Q1.7 e armazenados em blocos de memória M9K. O resultado é exibido em um monitor VGA com o nome do indivíduo reconhecido e acionamento de LEDs indicando liberação ou negação de acesso.
+A validação quantitativa demonstrou correlação de Pearson superior a 0,99 entre as ativações do modelo software e do hardware em todas as camadas intermediárias, confirmando a fidelidade da implementação em Verilog. O sistema integra os Artefatos 1 a 4 do cronograma proposto, abrangendo aquisição e treinamento offline, arquitetura RTL, pipeline de visão e comunicação, e integração final com demonstração funcional em bancada.
+
+
+ \textbf{Palavras-chave}: FPGA. reconhecimento facial. CNN embarcada. quantização de ponto fixo. verilog. DE2-115.
+\end{resumo}

@@ -1,0 +1,177 @@
+\documentclass[
+	% -- opções da classe memoir --
+	12pt,						% tamanho da fonte
+	openright,					% capítulos começam em pág ímpar (insere página vazia caso preciso)
+	oneside,					% para impressão em recto e verso. Oposto a oneside
+	a4paper,					% tamanho do papel. 
+	% -- opções da classe abntex2 --
+	%chapter=TITLE,				% títulos de capítulos convertidos em letras maiúsculas
+	%section=TITLE,				% títulos de seções convertidos em letras maiúsculas
+	%subsection=TITLE,			% títulos de subseções convertidos em letras maiúsculas
+	%subsubsection=TITLE,		% títulos de subsubseções convertidos em letras maiúsculas
+	% -- opções do pacote babel --
+	english,					% idioma adicional para hifenização
+	brazilian						% o último idioma é o principal do documento
+	]{abntex2}
+
+
+\usepackage{lmodern}			% Usa a fonte Latin Modern			
+\usepackage[T1]{fontenc}		% Selecao de codigos de fonte.
+\usepackage[utf8]{inputenc}		% Codificacao do documento (conversão automática dos acentos)
+\usepackage{indentfirst}		% Indenta o primeiro parágrafo de cada seção.
+\usepackage{color}				% Controle das cores
+\usepackage{graphicx}			% Inclusão de gráficos
+\usepackage{microtype} 			% para melhorias de justificação
+\usepackage{lipsum}				% para geração de dummy text
+\usepackage[brazilian,hyperpageref]{backref}	 % Paginas com as citações na bibl
+\usepackage[alf]{abntex2cite}	% Citações padrão ABNT
+\usepackage{multirow}
+\usepackage{colortbl}
+\usepackage{xcolor}
+\usepackage{pdfpages}
+\usepackage{forest}
+\usepackage{fontawesome}
+
+\definecolor{thered}{rgb}{0.65,0.04,0.07}
+\definecolor{thegreen}{rgb}{0.06,0.44,0.08}
+\definecolor{thegrey}{gray}{0.5}
+\definecolor{theshade}{rgb}{1,1,0.97}
+\definecolor{theframe}{gray}{0.6}
+\definecolor{blue}{RGB}{41,5,195} 
+
+\usepackage{listings}
+\lstset{
+	basicstyle=\small, % print whole listing small
+	keywordstyle=\color{blue}\bfseries, %\underbar,% underlined bold black keywords
+	% keywords=[0]{uint32_t, exit},
+	% keywordstyle=[0]\color{thered},
+	identifierstyle=, % nothing happens
+	commentstyle=\color{gray!85}, % white comments
+	stringstyle=\color{thered}\ttfamily, % typewriter type for strings
+	showstringspaces=false, % no special string spaces
+	numbers=left,
+	numberstyle=\tiny,
+	stepnumber=2
+}
+
+\definecolor{folderbg}{RGB}{124,166,198}
+\definecolor{folderborder}{RGB}{110,144,169}
+
+\def\Size{4pt}
+\tikzset{
+  folder/.pic={
+    \filldraw[draw=folderborder,top color=folderbg!50,bottom color=folderbg]
+      (-1.05*\Size,0.2\Size+5pt) rectangle ++ (.75*\Size,-0.2\Size-5pt);  
+    \filldraw[draw=folderborder,top color=folderbg!50,bottom color=folderbg]
+      (-1.15*\Size,-\Size) rectangle (1.15*\Size,\Size);
+  }
+}
+
+
+% Configurações do pacote backref
+% Usado sem a opção hyperpageref de backref
+\renewcommand{\backrefpagesname}{Citado na (s) página (s):~}
+% Texto padrão antes do número das páginas
+\renewcommand{\backref}{}
+% Define os textos da citação
+\renewcommand*{\backrefalt}[4]{
+	\ifcase#1
+		Nenhuma citação no texto.%
+	\or%
+		Citado na página #2.%
+	\else
+		Citado #1 vezes nas páginas #2.%
+	\fi}%
+\renewcommand{\orientadorname}{Docentes Responsáveis:}
+
+
+
+
+%-------------------------------------------------------------------------------------
+%		DADOS PESSOAIS
+%		Informações básicas sobre os trabalho e os autores 
+%-------------------------------------------------------------------------------------
+\titulo{Reconhecimento Facial com CNN em FPGA}
+\autor{}
+\local{Salvador}
+\data{Junho 2026}
+\tipotrabalho{Trabalho Final da Disciplina} 
+\tipotrabalho{Trabalho Final da Disciplina} 
+\preambulo{Trabalho final da disciplina Laboratório Integrado I-A apresentado aos professores Wagner Luiz Alves de Oliveira e Edmar Egídio Purcino de Souza como requisito parcial para obtenção de nota final da disciplina.}
+\orientador{Prof. Dr. Edmar Egídio Purcino de Souza \\
+Prof. Dr. Wagner Luiz Alves de Oliveira
+}
+
+\instituicao{%
+  Universidade Federal da Bahia - UFBA \\
+  Escola Politécnica
+}
+
+%	Configurações de aparência do PDF final
+\input{config_pdf}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%																					 %
+% 							 Início do documento								     %
+%																					 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{document}
+
+%\selectlanguage{english}
+\selectlanguage{brazilian}
+
+% Retira espaço extra obsoleto entre as frases.
+\frenchspacing
+
+\imprimircapa
+
+\imprimirfolhaderosto*	% (o * indica que haverá a ficha bibliográfica)
+
+% inserir o sumario
+\pdfbookmark[0]{\contentsname}{toc}
+\tableofcontents*
+\cleardoublepage%
+
+
+%-------------------------------------------------------------------------------------
+% 		ELEMENTOS PRÉ-TEXTUAIS
+%		Insire elementos pré textuais
+%-------------------------------------------------------------------------------------
+\include{pre-textuais/resumo}
+
+
+%-------------------------------------------------------------------------------------
+% 		ELEMENTOS TEXTUAIS
+%		Informações relevantes ao trabalho, capítulos e suas respectivas seções.
+%-------------------------------------------------------------------------------------
+\textual%
+% Introdução
+\include{capitulos/introducao}
+
+% Primeira Entrega
+\include{capitulos/artefato1}
+% ---------------------------
+
+% Segunda Entrega
+\include{capitulos/artefato2}
+% ---------------------------
+
+% Terceira Entrega
+\include{capitulos/artefato3}
+% ---------------------------
+
+% Entrega Final
+\include{capitulos/artefato4}
+% ---------------------------
+
+% Conclusão
+\include{capitulos/conclusão}
+
+%-------------------------------------------------------------------------------------
+%		CONTEÚDO PÓS-TEXTUAL
+%		Parte do documento que aparece após o capítulo de conclusão, incluindo 
+%		bibliografia e anexos.
+%-------------------------------------------------------------------------------------
+\postextual\bibliography{references} 
+
+\end{document}
