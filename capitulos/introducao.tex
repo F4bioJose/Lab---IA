@@ -1,3 +1,18 @@
 \chapter{Introdução}
-% ----------------------------------------------------------
-\lipsum[1-4]
+O reconhecimento facial tem sido um instrumento amplamente utilizado para contextos de identificação e garantia de segurança. O mapeamento de padrões e características é essencial para o bom funcionamento de um sistema de proteção. Nesse cenário, o desenvolvimento de interfaces homem-máquina (IHM) tem avançado com o aumento da capacidade computacional em sistemas embarcados.
+Para traduzir essas características em dados quantizados, as Redes Neurais Convolucionais (CNNs) têm se mostrado altamente eficazes. Em uma aplicação real voltada para a autorização da entrada de um indivíduo cadastrado em um estabelecimento, o fluxo de dados exige a aquisição de imagem em tempo real, o pré-processamento e a inferência no modelo de Deep Learning. Contudo, a etapa de inferência impõe um alto custo computacional. Processadores de uso geral e microcontroladores processam as matrizes da rede neural de forma puramente sequencial, o que pode representar um gargalo crítico para a percepção de tempo real do usuário.
+Para a implementação da rede neural no FPGA, optou-se pelo desenvolvimento manual dos módulos de hardware utilizando a Linguagem de Descrição de Hardware (HDL) Verilog. Essa abordagem permite maior controle sobre a arquitetura implementada, possibilitando a exploração explícita do paralelismo inerente às operações convolucionais e de multiplicação-acumulação (MAC) presentes na CNN. Além disso, a implementação manual permite avaliar de maneira mais precisa os benefícios e os custos associados ao desenvolvimento de aceleradores dedicados para aplicações de Inteligência Artificial embarcada.
+
+\section*{Objetivo}
+Este trabalho tem como objetivo o desenvolvimento de uma Tiny-CNN, seu respectivo treinamento utilizando a linguagem de programação Python através de um dataset com fotos dos integrantes convertidas em escala cinza, a implementação de seu modelo matemático em linguagem de hardware Verilog - além da integração de periféricos, como o protocolo UART e a transmissão de imagem via VGA - e o teste prático do modelo em uma placa FPGA DE2-115.
+
+\section*{Metodologia}
+Os dados de treinamento foram obtidos através de uma câmera de notebook, em sala de aula, em gravações de vídeos de cada integrante, extraindo os frames dos vídeos utilizando a biblioteca openCV em Python e tratando-os em escala cinza e o respectivo treinamento foi realizado mediante Keras. Já o teste de funcionamento do modelo matemático em Verilog baseado na construção do modelo Python foi feito pelo software ModelSim, e seu respectivo resultado de simulação comparado com o resultado do modelo Python.
+O procedimento adotado foi a construção aditiva e gradual da rede em paralelo com implementação e testes de módulos lógicos em Verilog, orquestrados por uma Máquina de Estados Finitos (FSM) confeccionada também paralelamente.
+
+\section*{Justificativa}
+O trabalho foi confeccionado visando o aprendizado acerca de redes neurais, a compreensão da construção de algoritmos tanto em Python quanto em Verilog e o entendimento da importância de sistemas embarcados para a implementação eficaz de processos computacionais estruturados e complexos.
+
+
+\section*{Estrutura do Trabalho}
+O projeto foi dividido em 4 etapas: A confecção e treinamento da Tiny-CNN multiclasse utilizando Python e Keras, a implementação do modelo matemático da CNN em Verilog, dividido em módulos de convolução 3×3 com ReLU (4 filtros), Max Pooling 2×2, Flatten e camada Densa 900×19, a construção da lógica de transmissão via UART da imagem obtida para a FPGA, assim como lógica de a transmissão de imagem exibida em um monitor VGA, e, por fim, a confecção de sprites identificadores dos integrantes e a integração de todos os módulos e seu respectivo teste de funcionamento na FPGA DE2-115.

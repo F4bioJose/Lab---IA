@@ -1,0 +1,2 @@
+# Layer: dense | Image: gabriel_treino.jpg | Format: s0..s18 (Q6.10 signed) | Classe 0=Desconhecido, 1..18=Pessoas
+-12108 -22307 -24581 -32768 -32768 -20452 -32768 -32768 -29982 -19776 -32768 -21014 -32768 -3682 -13693 -32768 9530 -10900 -14289

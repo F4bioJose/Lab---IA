@@ -1,0 +1,2 @@
+# Layer: dense | Image: inputs/imgs_hex/desconhecido1_hex.txt | Format: s0..s18 (Q6.10 signed) | Classe 0=Desconhecido, 1..18=Pessoas
+4593 -32768 -23540 -32768 -32768 -32768 -32347 -27007 -32768 -16899 -11871 -31476 -17270 -12217 -32768 -32768 -5224 -25230 -25153

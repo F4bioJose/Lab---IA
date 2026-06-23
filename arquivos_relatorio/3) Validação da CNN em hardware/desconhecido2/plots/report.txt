@@ -1,0 +1,15 @@
+============================================================
+  RELATÓRIO DE COMPARAÇÃO SW vs. HW — CNN 19 Classes
+============================================================
+  Sem threshold — Desconhecido = classe 0 (nativo da rede)
+  Predição SW : classe 0 = 'Desconhecido' [DESCONHECIDO]
+  Predição HW : classe 0 = 'Desconhecido' [DESCONHECIDO]
+  Concordância: ✓ SIM
+------------------------------------------------------------
+  Camada           N      MAE     RMSE   MaxErr   Exato%   Pearson
+------------------------------------------------------------
+  conv          3600    40.04    73.37      327    49.7%    0.9998
+  pool           900    53.90    86.72      326    36.2%    0.9998
+  flat           900    53.90    86.72      326    36.2%    0.9998
+  dense           19   168.58   232.64      605    31.6%    0.9999
+============================================================

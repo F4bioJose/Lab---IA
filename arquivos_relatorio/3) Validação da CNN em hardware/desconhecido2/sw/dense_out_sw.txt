@@ -1,0 +1,2 @@
+# Layer: dense | Image: desconhecido2.jpg | Format: s0..s18 (Q6.10 signed) | Classe 0=Desconhecido, 1..18=Pessoas
+12720 -29522 -29582 -32768 -13822 -32768 -6671 -24421 -32768 -21026 -4440 -31114 -26006 -5816 -32768 -32768 -21592 -28629 -32768

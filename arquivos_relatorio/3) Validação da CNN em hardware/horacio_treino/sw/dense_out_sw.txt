@@ -1,0 +1,2 @@
+# Layer: dense | Image: horacio_treino.jpg | Format: s0..s18 (Q6.10 signed) | Classe 0=Desconhecido, 1..18=Pessoas
+-8376 -22006 -18922 -32768 -32768 -19104 -32768 -32768 -32768 -18808 -32768 -22860 -26042 -8267 -18327 -29293 -13257 14458 -14712

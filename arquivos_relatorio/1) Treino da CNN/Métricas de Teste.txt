@@ -1,0 +1,33 @@
+--- Metricas de Teste (Multiclasse) ---
+AUC OvR (macro): 0.9999
+Macro-F1: 0.9901
+Balanced Accuracy: 0.9918
+Recall da classe desconhecido (negar invasor): 0.9608
+Recall macro dos alunos autorizados: 0.9936
+
+--- Relatório de Classificação ---
+                  precision    recall  f1-score   support
+
+  0_desconhecido       0.98      0.96      0.97      1020
+         10_Igor       0.99      1.00      1.00       300
+         11_Joao       1.00      1.00      1.00       300
+12_Jose_Henrique       1.00      1.00      1.00       119
+        13_Julia       1.00      1.00      1.00       300
+        14_Lucio       1.00      0.99      1.00       300
+        15_Naira       1.00      1.00      1.00       300
+       16_Rafael       0.88      0.93      0.90       179
+       17_Samuel       1.00      1.00      1.00       300
+         18_Yuri       0.98      1.00      0.99       300
+    1_Anna_Carol       1.00      0.98      0.99       300
+         2_Bruno       1.00      1.00      1.00       300
+         3_Diego       0.99      1.00      1.00       300
+       4_Eduardo       0.97      1.00      0.99       300
+         5_Fabio       1.00      1.00      1.00       300
+        6_Felipe       1.00      0.99      1.00       300
+       7_Gabriel       1.00      1.00      1.00       300
+       8_Horacio       0.99      1.00      1.00       300
+          9_Hugo       0.99      1.00      1.00       300
+
+        accuracy                           0.99      6118
+       macro avg       0.99      0.99      0.99      6118
+    weighted avg       0.99      0.99      0.99      6118

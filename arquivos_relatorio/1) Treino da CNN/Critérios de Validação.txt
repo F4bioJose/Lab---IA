@@ -1,0 +1,17 @@
+✅ CRITÉRIOS DE VALIDAÇÃO:
+======================================================================
+
+1. Diferença média < 0.02:
+   ✅ PASSOU (atual: 0.000078)
+
+2. Mudança de predição < 5.0%:
+   ✅ PASSOU (atual: 0.08%)
+
+3. Degradação de acurácia < 1.0%:
+   ✅ PASSOU (atual: -0.03%)
+
+4. Degradação de Macro-F1 < 1.0%:
+   ✅ PASSOU (atual: -0.03%)
+
+5. Degradação de AUC < 1.0%:
+   ✅ PASSOU (atual: -0.00%)

@@ -1,0 +1,2 @@
+# Layer: dense | Image: inputs/imgs_hex/gabriel_treino_hex.txt | Format: s0..s18 (Q6.10 signed) | Classe 0=Desconhecido, 1..18=Pessoas
+-12013 -22082 -24432 -32768 -32768 -20298 -32768 -32768 -29772 -19487 -32768 -20713 -32768 -3684 -13677 -32768 9297 -10999 -14192
