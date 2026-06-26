@@ -1,2 +1,0 @@
-# Layer: dense | Image: inputs/imgs_hex/horacio_treino_hex.txt | Format: s0..s18 (Q6.10 signed) | Classe 0=Desconhecido, 1..18=Pessoas
--8337 -21712 -18884 -32768 -32768 -18729 -32768 -32768 -32768 -18539 -32512 -22802 -25960 -8349 -18208 -29144 -13385 14229 -14691

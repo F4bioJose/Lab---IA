@@ -1,2 +1,75 @@
 \chapter{Sistema de Visão e Comunicação}
-\lipsum[1-4]
+\section{Protocolo UART}
+A UART atua como o único canal de alimentação de dados dinâmicos para a FPGA. Sem este módulo, a rede neural carece de dados de entrada, impossibilitando o reconhecimento facial. O projeto implementa exclusivamente a via de recepção (RX), resolvendo o problema crítico de transferir dados do mundo de software (PC/Python) para o domínio de hardware (FPGA) sem um barramento complexo (como PCIe ou USB nativo). A robustez desse módulo é crítica, pois qualquer dessincronização ou erro de enquadramento corrompe a imagem. 
+Os parâmetros e interface física do módulo são os seguintes:
+\begin{enumerate}[nosep]
+    \item Frequência de Operação: 50 MHz (Clock nativo da DE2-115).
+    \item Parâmetros de Comunicação (Padrão): Baud Rate configurado e integrado a 2.000.000 bps (2Mbaud), 8 bits de dados, sem paridade, 1 Stop Bit.
+    \item Interface Física: Recepção de sinal TTL 3.3V proveniente de adaptador USB-TTL externo conectado aos pinos de expansão GPIO (JP5).
+\end{enumerate}
+Como o protocolo é assíncrono, a FPGA não compartilha o relógio com o PC. O sincronismo é calculado pela razão entre a frequência da placa e a taxa de transmissão desejada:
+
+O número de ciclos de \textit{clock} por \textit{bit} é calculado pela razão entre a frequência do \textit{clock} e a taxa de transmissão (baud rate):
+
+$$ \text{Cycles per bit} = \frac{f_{\text{clk}}}{\text{Baud Rate}} $$
+
+Para um \textit{clock} de 50 MHz e uma taxa de transmissão de 2 Mbps, obtém-se 25 ciclos de \textit{clock} por \textit{bit}.
+O submódulo \texttt{uart\_rx} realiza oversampling assíncrono gerenciado por uma Máquina de Estados Finitos (FSM) de quatro estados: IDLE, START, DATA e STOP.
+
+\begin{enumerate}[nosep]
+    \item IDLE: Em repouso, a linha serial permanece em nível alto. A detecção do start bit ocorre por uma borda de descida no pino \texttt{rx\_pin}.
+    \item START: A FSM aguarda exatamente metade de um período de bit (12 ciclos). Se o pino retornar a '1', a máquina aborta a recepção, descartando o ruído transiente (glitch). Se continuar '0', o start bit é confirmado.
+    \item DATA: Os 8 bits de dados são amostrados no centro de cada período de bit subsequente, sendo reconstruídos por um registrador de deslocamento LSB-first.
+    \item STOP: Ao término da amostragem, o sistema aguarda o stop bit. O byte completo é disponibilizado na saída \texttt{data\_out}, acompanhado de um pulso de um ciclo no sinal \texttt{data\_valid} (flag de data ready), retornando ao estado IDLE.
+\end{enumerate}
+
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{imagens/image10.png}
+    \caption{Caption}
+    \label{fig:placeholder}
+\end{figure}
+
+Devido à assincronia com o mundo externo, o sinal RX passa por um circuito Double-Sync Flip-Flop (\texttt{rx\_sync\_1} e \texttt{rx\_sync\_2}) antes de entrar na UART, mitigando a ocorrência de metaestabilidade.
+Dentro da arquitetura global, a UART não escreve diretamente na memória. Ela age como um produtor em um padrão produtor-consumidor, alimentando a máquina de estados orquestradora localizada no módulo \texttt{cnn\_top}. Essa FSM consome os bytes da UART e decide dinamicamente o roteamento dos pixels com base em um protocolo de Byte de Controle, demultiplexando o fluxo para exibição (VGA) ou para inferência (CNN).
+O mapa hierárquico do Caminho UART se dá da seguinte forma:
+
+\begin{verbatim}
+fpga_top_unified.v (Top-Level)
+|
+|-- cnn_top.v (Orquestrador)
+|   |-- Registradores de Double-Sync (rx_sync_1, rx_sync_2)
+|   \-- Lógica Combinacional de Demultiplexação (uart_wr_en_comb,
+|       video_fb_wr_en)
+|
+|-- uart_rx.v (Receptor Serial)
+|
+|-- framebuffer_32x32.v (Consumidor A: Inferência + VGA)
+|
+\-- framebuffer_128x128.v (Consumidor B: Apenas VGA)
+\end{verbatim}
+
+O primeiro byte recebido de cada novo frame atua como uma chave de controle:
+\subsection*{Se o Byte = 0xFF} O fluxo é roteado para o Modo Rosto. O sinal combinacional \texttt{uart\_wr\_en\_comb} é ativado, escrevendo os próximos 1024 bytes na porta A do \texttt{framebuffer\_32x32}.
+\subsection*{Se o Byte =/= 0xFF} O fluxo é roteado para o Modo Vídeo. A FSM ativa o sinal \texttt{video\_fb\_wr\_en}, gravando os próximos 16384 bytes diretamente no \texttt{framebuffer\_128x128}.
+Desta forma, o módulo \texttt{uart\_rx} atua de maneira dissociada da memória, garantindo que o pipeline da rede neural só seja engatilhado mediante o recebimento empacotado e validado de uma matriz pertinente à inferência.
+
+
+\section{VGA}
+Para realizar a transmissão de vídeo entre o FPGA e o monitor VGA, que por padrão tem 640x480 de área, foram estabelecidos valores de offsets de altura (\texttt{V\_OFFSET} = (480 - 384) / 2 = 48) e de largura (\texttt{H\_OFFSET} = (640 - 384) / 2 = 128). Estes valores são subtraídos dos contadores de varredura para a geração das coordenadas locais (\texttt{local\_x, local\_y}). Gerando um quadrado de exibição centralizado de 384x384 para as imagens nos modos vídeo e rosto.
+
+Para operar de acordo com o que ocorre nas etapas de validação do frame facial ou exibição do vídeo, o VGA depende de uma série de sinais vindos do módulo \texttt{cnn\_top}. Dentre esses sinais, o sinal \texttt{class\_id} contém o identificador da classe reconhecida, sendo utilizado para determinar se o frame corresponde a uma pessoa cadastrada. O \texttt{access\_done} informa que o processamento do frame foi concluído (pipeline terminado) que o resultado da validação encontra-se disponível para os demais sinais. O sinal \texttt{frame\_ready} é utilizado para indicar que um novo frame foi capturado, sendo usado para controle de LEDs e definição do variável que limpa o sprite (exibição de campo sem nome). Por último, o sinal de \texttt{frame\_mode} chaveia o modo de exibição do vga. 
+
+\subsection{Modo Vídeo}
+Neste modo, o sistema precisa exibir o feed da câmera, que possui resolução de 128x128 pixels, com usamos uma janela de 384x384. Isso exige fator de ampliação de 3x no vídeo recebido. Para evitar a síntese de divisores em hardware, a interpolação ocorre via aritmética de ponto fixo. A coordenada sofre multiplicação por uma constante igual a 2 elevado a 16 dividido por 3, resultando em 21845. O hardware então executa um deslocamento de bits (operação de shift) para o descarte da fração (\texttt{vid\_x\_full}[22:16]). O endereçamento do framebuffer de 128x128 ocorre por concatenação de eixos (\texttt{vid\_y, vid\_x}).
+
+\subsection{Modo Rosto}
+Quando o Haar Cascade detectar uma face, o sistema foca em uma miniatura de 32x32 pixels, novamente por termos uma janela de exibição de 384x384. Isto exige fator de zoom, a coordenada \texttt{local\_x} sofre multiplicação por K igual a 2 elevado a 16 dividido por 12, resultando em 5462. Com a extração de 5 bits (\texttt{fb\_x\_full}[20:16]), obtém-se a divisão por 12. A vetorização de endereço para o framebuffer de 32x32 ocorre por operação de concatenação (\texttt{fb\_y, fb\_x}). A inclusão de nomes ocorre por leitura da \texttt{rom\_sprites} através da verificação do sinal \texttt{display\_mode}. Com o sinal em zero, o sistema inibe a leitura de texto. Com o sinal em um, ocorre a comparação dos contadores de pixel com as margens da área de sprite. O cruzamento na área (\texttt{in\_sprite\_window}) gera o endereço e a leitura da ROM. O bit lido atua como seletor no multiplexador, causando a substituição da cor de imagem pela cor de texto. O retorno do sinal \texttt{frame\_mode} para zero aciona a limpeza do registrador de identificação (\texttt{display\_class\_id}) e cessa a sobreposição de texto na tela.
+
+\subsection{Sprite de nomes}
+Cada sprite foi fixado na resolução de 256x32 pixels, ocupando 8.192 endereços físicos na memória. A ROM foi projetada para comportar 19 classes, gerando um total de 155.648 endereços de bit. Para garantir precisão, foi utilizado HTML e CSS para criar a imagem e um script Python feito com uso da biblioteca OpenCV responsável por aplicar binarização, definindo os caracteres como nível lógico 0 e 1, e compilar o arquivo de inicialização de memória (.mif) referenciado no módulo \texttt{rom\_sprite}. 
+O tamanho dos blocos (total de bit de cada nome), possibilitou o uso de bit shift (deslocamento binário) para paginação da ROM ao invés do uso de blocos multiplicadores (DSP). 
+
+\subsection{Controle de Exibição}
+Para fazer o controle de exibição dos modos foi usada uma arquitetura de chaveamento de datapath. O sinal da CNN (\texttt{frame\_mode}) opera no domínio de clock de 50 MHz. Para o cruzamento deste sinal para a interface (25 MHz), ocorre a utilização de dois registradores em sequência (\texttt{frame\_mode\_sync} e logo depois \texttt{display\_mode}), resultando na geração do sinal \texttt{display\_mode}. Este sinal governa o Multiplexador 2-para-1, que seleciona o barramento de memória (128x128 ou 32x32) com base na lógica condicional do \texttt{display\_mode}. Para a compensação de latência de 1 ciclo de clock na leitura de memórias, os sinais de sincronismo (hsync, vsync e \texttt{video\_on}) dos geradores de pulso passam por um estágio de retardo .

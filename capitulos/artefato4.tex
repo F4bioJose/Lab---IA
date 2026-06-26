@@ -1,2 +1,67 @@
 \chapter{Integração Final e Validação}
-\lipsum[1-4]
+
+\section{Pipeline}
+O sistema implementa uma fechadura biométrica inteligente cujo fluxo de operação se divide em dois domínios distintos: o domínio de software, executado em um computador hospedeiro, e o domínio de hardware, sintetizado na FPGA DE2-115. A separação entre os domínios é estabelecida pela interface serial UART a 115200 \textit{baud}, que transporta os dados de imagem do PC para a placa de forma unidirecional.
+
+No domínio de software, o script Python captura um \textit{frame} da webcam, aplica o algoritmo Haar Cascade para detecção e recorte do rosto com \textit{padding} de 15\%, normaliza a iluminação via CLAHE, redimensiona a imagem para $32 \times 32$ pixels e quantiza os valores de pixel para o formato Q1.7, resultando em 1024 bytes que são transmitidos serialmente à FPGA. A inferência é disparada automaticamente quando o Haar Cascade detecta um rosto dentro da tolerância de tamanho definida, evitando o envio de \textit{frames} sem rosto e reduzindo classificações incorretas.
+
+No domínio de hardware, a FPGA recebe os bytes via módulo \texttt{uart\_rx}, armazena a imagem completa no \textit{framebuffer} interno de 1024 posições e, ao confirmar o recebimento do último pixel, dispara automaticamente a Máquina de Estados (FSM) de inferência. O resultado — o índice da classe predita — é guardado (\textit{latched}) nos LEDs e no controlador VGA, que exibe o nome do indivíduo reconhecido e o \textit{status} de acesso no monitor.
+
+\section{Diagrama de Blocos}
+O sistema é organizado em cinco camadas funcionais hierárquicas, descritas a seguir de cima para baixo:
+
+\begin{description}
+    \item[Camada de Captura (PC):] Webcam USB $\rightarrow$ detecção Haar Cascade $\rightarrow$ pré-processamento CLAHE $\rightarrow$ quantização Q1.7 $\rightarrow$ serialização UART.
+    \item[Camada de Recepção (FPGA):] O módulo \texttt{uart\_rx} decodifica o protocolo 8N1 a 115200 \textit{baud} e entrega bytes válidos ao \textit{framebuffer}. O \texttt{framebuffer\_32x32} mantém duas RAMs espelhadas de $1024 \times 8$ \textit{bits} — uma dedicada ao \textit{pipeline} da CNN e outra ao controlador VGA —, permitindo leituras simultâneas independentes.
+    \item[Camada de Inferência (FPGA):] A FSM \texttt{cnn\_top} orquestra sequencialmente os módulos computacionais. O \texttt{line\_buffer\_32x32} mantém as duas últimas linhas da imagem para extração de janelas $3 \times 3$ em tempo real. O \texttt{convolucao\_mac} aplica quatro filtros paralelos com acumuladores de 20 \textit{bits} e ReLU combinacional. O \texttt{max\_pooling\_design} reduz o mapa de $30 \times 30$ para $15 \times 15$ por canal usando uma FIFO interna de 32 posições para suavização do fluxo. O \texttt{flatten} serializa os 900 elementos. A \texttt{dense\_900x19} mantém 19 acumuladores paralelos de 48 \textit{bits} em formato Q3.21, convertendo para Q6.10 ao final. O \texttt{argmax\_19} seleciona a classe de maior \textit{score} por comparação em cascata combinacional.
+    \item[Camada de Pesos (FPGA):] O módulo \texttt{weights\_shared\_rom} carrega os 17.159 bytes de parâmetros — 36 pesos convolucionais, 4 \textit{biases} de convolução, 17.100 pesos densos e 19 \textit{biases} densos — a partir do arquivo \texttt{weights\_all.mif} inicializado nos blocos M9K durante a síntese. Um \textit{bootloader} de hardware distribui os pesos da ROM mestre para 19 sub-blocos M9K paralelos, um por classe, permitindo leitura simultânea de todos os pesos densos em um único ciclo de \textit{clock}.
+    \item[Camada de Exibição (FPGA):] O módulo \texttt{top\_vga} gera os sinais de sincronismo HSYNC e VSYNC para o padrão $640 \times 480$ a 60 Hz utilizando uma PLL que deriva 25,175 MHz a partir do \textit{clock} de 50 MHz da placa. A lógica de composição de tela divide a área visível em três regiões: o rosto capturado lido diretamente do \textit{framebuffer}, o \textit{bitmap} de \textit{status} ("LIBERADO" em verde ou "NEGADO" em vermelho) lido de ROMs de $128 \times 32$ \textit{bits}, e o nome do indivíduo reconhecido lido de uma entre 18 ROMs de nome, selecionada pelo \texttt{class\_id}. Os LEDs verdes acendem em padrão binário com o \texttt{class\_id} predito, sinalizando a inferência concluída ou indicando a classe "Desconhecido".
+\end{description}
+
+\subsection{Fluxo de Dados \textit{End-to-End}}
+O projeto é composto por dois \textit{pipelines} que compartilham o mesmo \textit{framebuffer} de imagem:
+\begin{itemize}
+    \item \textbf{\textit{Pipeline} CNN (50 MHz):} Recebe a imagem, processa as camadas da rede neural (convolução, \textit{max pooling}, camada densa) e identifica a classe.
+    \item \textbf{\textit{Pipeline} VGA (25 MHz):} Lê a mesma imagem do \textit{framebuffer} e a renderiza no monitor, junto com um \textit{sprite} de texto contendo o nome da classe predita.
+\end{itemize}
+
+O script Python captura um \textit{frame} da webcam e tenta detectar um rosto via Haar Cascade. Se um rosto é detectado, o script envia o byte de controle \texttt{0xFF} seguido de 1024 bytes (imagem $32 \times 32$ em escala de cinza, quantizada em Q1.7). Se não detectar um rosto, envia \texttt{0x00} seguido de 16.384 bytes (imagem $128 \times 128$ para exibição apenas). A FPGA, então, armazena a imagem no \textit{framebuffer} correspondente. O controlador VGA lê continuamente e exibe a imagem ampliada (12$\times$ para rosto, 3$\times$ para vídeo) centrada no monitor ($384 \times 384$ pixels na região central de $640 \times 480$). 
+
+Para \textit{frames} de rosto, o \textit{pipeline} da CNN processa automaticamente: convolução com 4 filtros $3 \times 3$, \textit{max pooling} $2 \times 2$, camada densa $900 \rightarrow 19$ e \textit{argmax}. O \texttt{class\_id} resultante determina qual \textit{sprite} de nome aparece na parte inferior da tela (verde para pessoa reconhecida, vermelho para desconhecido) e qual LED acende.
+
+Diante disso, o módulo de mais alto nível da implementação (\texttt{fpga\_top\_unified}) é responsável por integrar o fluxo da CNN com a exibição no VGA. Simplificadamente, ele pode ser representado pelo diagrama da Figura \ref{fig:top_unified}.
+
+% TODO: Insira a imagem do primeiro diagrama aqui
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=1\textwidth]{imagens/image12.jpg}
+    \caption{Diagrama de blocos do módulo \texttt{fpga\_top\_unified}.}
+    \label{fig:top_unified}
+\end{figure}
+
+Assim, suas funções incluem: gerenciamento do \textit{clock} do VGA através do \texttt{vga\_pll}, mapeamento das coordenadas para exibição em tela e renderização da imagem final. Além disso, é também responsável por comandar o fluxo entre a CNN e o VGA. Diferentemente dos demais módulos de controle, com estados e caracterizações explícitas de FSM, o \texttt{fpga\_top\_unified} coordena essas duas implementações por meio de um registrador (o \texttt{display\_class\_id}). Simplificadamente, seu valor é mantido sempre em 0 até receber a confirmação de que a inferência foi concluída. Neste instante, seu valor passa a ser o mesmo do sinal de saída da CNN (o \texttt{class\_id}, descrito acima).
+
+Esse comportamento é o que explica a existência do “vazio” dentro dos \textit{sprites}. Para limpar a exibição dos nomes, o registrador simplesmente transita entre um nome válido e o 0, conforme o diagrama da Figura \ref{fig:transicao_sprites}.
+
+% TODO: Insira a imagem do segundo diagrama aqui
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{imagens/image14.png}
+    \caption{Diagrama de transição de estados do registrador para exibição dos \textit{sprites}.}
+    \label{fig:transicao_sprites}
+\end{figure}
+
+
+\section{Validação do Artefato Final}
+Para validar o fluxo final, foi feita uma análise lógica dos sinais utilizando o software Quartus. Em suma, desejava-se demonstrar que o fluxo da CNN, bem como seu resultado final, eram efetivamente processados de forma correta pela FPGA. Os vídeos referenciados abaixo ilustram esse comportamento.
+
+% TODO: Substitua pelo link real do vídeo ou utilize uma nota de rodapé
+\noindent \textbf{Demonstração em Vídeo:} \url{https://link-do-video.com}
+
+
+\section{Problemas Encontrados}
+Uma das dificuldades encontradas foi a discrepância no volume final de imagens entre os integrantes da equipe. Enquanto a maioria das classes atingiu a meta, as classes referentes a dois integrantes apresentaram volumes inferiores, mostrados na matriz de confusão pelo total de 119 e 179 amostras, respectivamente, contra aproximadamente 300 dos outros integrantes. Essa limitação ocorreu devido à menor duração dos vídeos originais gravados por esses membros, o que ocasionou uma menor quantidade de amostras extraídas. Mesmo com as técnicas de preenchimento sintético descritas na seção da CNN, o volume final não chegou a 300 amostras nestas classes.
+
+Outro problema encontrado no desenvolvimento do trabalho foi a quantização dos pesos da rede neural. Inicialmente, os pesos eram quantizados globalmente em Q1.7, porém foi definido posteriormente que cada saída fosse quantizada de maneira otimizada. Logo, a determinação de quantização — como, por exemplo, na saída em Q6.10, devido ao risco de perda de informações cruciais para a acurácia da rede — tornou-se uma questão técnica que ampliou a complexidade do trabalho.
+
+Por fim, a implementação das FSMs de controle representou um desafio para a finalização do projeto, principalmente em relação ao módulo de \texttt{argmax}, devido a erros de quantização no Quartus. Para mitigar isso, foram implementadas FSMs dedicadas para diferentes módulos da arquitetura em hardware, as quais são orquestradas por uma FSM geral (\textit{top-level}), consolidando a integração da rede no sistema embarcado.

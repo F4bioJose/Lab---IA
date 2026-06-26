@@ -29,8 +29,15 @@
 \usepackage{colortbl}
 \usepackage{xcolor}
 \usepackage{pdfpages}
+\usepackage{amsmath}
+\usepackage{amssymb}
 \usepackage{forest}
 \usepackage{fontawesome}
+\usepackage{booktabs}
+\usepackage{graphicx} 
+\usepackage{array}   
+
+
 
 \definecolor{thered}{rgb}{0.65,0.04,0.07}
 \definecolor{thegreen}{rgb}{0.06,0.44,0.08}
@@ -110,6 +117,8 @@ Prof. Dr. Wagner Luiz Alves de Oliveira
 %	Configurações de aparência do PDF final
 \input{config_pdf}
 
+\usepackage{float}              % Ajusta as imagens [H]
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %																					 %
 % 							 Início do documento								     %
@@ -126,6 +135,16 @@ Prof. Dr. Wagner Luiz Alves de Oliveira
 \imprimircapa
 
 \imprimirfolhaderosto*	% (o * indica que haverá a ficha bibliográfica)
+
+% Inserir a lista de quadros (Nativo do abntex2)
+\pdfbookmark[0]{\listofquadrosname}{loq}
+\listofquadros*
+\cleardoublepage
+
+% Inserir a lista de tabelas
+\pdfbookmark[0]{\listtablename}{lot}
+\listoftables*
+\cleardoublepage%
 
 % inserir o sumario
 \pdfbookmark[0]{\contentsname}{toc}
@@ -167,6 +186,8 @@ Prof. Dr. Wagner Luiz Alves de Oliveira
 % Conclusão
 \include{capitulos/conclusão}
 
+% Contribuições
+\include{capitulos/contribuicoes}
 %-------------------------------------------------------------------------------------
 %		CONTEÚDO PÓS-TEXTUAL
 %		Parte do documento que aparece após o capítulo de conclusão, incluindo 

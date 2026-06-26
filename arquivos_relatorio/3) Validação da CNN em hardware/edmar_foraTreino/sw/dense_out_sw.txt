@@ -1,2 +1,0 @@
-# Layer: dense | Image: edmar_foraTreino.png | Format: s0..s18 (Q6.10 signed) | Classe 0=Desconhecido, 1..18=Pessoas
--2462 -13816 -22499 -32768 -32768 -32768 -32768 -28482 -30457 -21781 -15790 -22311 -32768 -9610 -32768 -32768 -23552 -24051 -13962

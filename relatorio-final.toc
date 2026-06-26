@@ -1,0 +1,60 @@
+\changetocdepth {4}
+\babel@toc {brazil}{}\relax 
+\babel@toc {brazilian}{}\relax 
+\setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
+\setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
+\setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
+\setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
+\contentsline {chapter}{\chapternumberline {1}\MakeTextUppercase []{Introdução}}{7}{chapter.1}%
+\contentsline {section}{\numberline {1.1}Objetivos}{7}{section.1.1}%
+\contentsline {section}{\numberline {1.2}Metodologia}{8}{section.1.2}%
+\contentsline {section}{\numberline {1.3}Justificativa}{8}{section.1.3}%
+\setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
+\contentsline {chapter}{\chapternumberline {2}\MakeTextUppercase []{Aquisição de Dados e Treinamento Offline}}{9}{chapter.2}%
+\contentsline {section}{\numberline {2.1}Confecção e treinamento da Rede Neural Convolucional (CNN)}{9}{section.2.1}%
+\contentsline {subsection}{\numberline {2.1.1}Classes de 1 a 18: Autorizados (Equipe)}{9}{subsection.2.1.1}%
+\contentsline {section}{\numberline {2.2}Implementação}{10}{section.2.2}%
+\contentsline {section}{\numberline {2.3}Inferência e Validação}{11}{section.2.3}%
+\contentsline {subsection}{\numberline {2.3.1}Métricas de Treinamento}{11}{subsection.2.3.1}%
+\contentsline {subsection}{\numberline {2.3.2}Métricas de Teste e Relatório de Classificação}{12}{subsection.2.3.2}%
+\contentsline {section}{\numberline {2.4}Quantização e Exportação (.MIF)}{13}{section.2.4}%
+\setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
+\contentsline {chapter}{\chapternumberline {3}\MakeTextUppercase []{Arquitetura de Hardware (RTL)}}{14}{chapter.3}%
+\contentsline {section}{\numberline {3.1}Gerenciamento de Processamento: Módulo \texttt {cnn\_top}}{14}{section.3.1}%
+\contentsline {subsection}{\numberline {3.1.1}Papel e Comportamento dos Submódulos}{14}{subsection.3.1.1}%
+\contentsline {subsubsection}{\numberline {3.1.1.1}UART}{14}{subsubsection.3.1.1.1}%
+\contentsline {subsubsection}{\numberline {3.1.1.2}Framebuffer $32 \times 32$}{15}{subsubsection.3.1.1.2}%
+\contentsline {subsubsection}{\numberline {3.1.1.3}Line Buffer}{15}{subsubsection.3.1.1.3}%
+\contentsline {subsubsection}{\numberline {3.1.1.4}Convolução}{15}{subsubsection.3.1.1.4}%
+\contentsline {subsubsection}{\numberline {3.1.1.5}Max Pooling}{16}{subsubsection.3.1.1.5}%
+\contentsline {subsubsection}{\numberline {3.1.1.6}Flatten (``Achatamento'')}{16}{subsubsection.3.1.1.6}%
+\contentsline {subsubsection}{\numberline {3.1.1.7}Camada Densa}{16}{subsubsection.3.1.1.7}%
+\contentsline {subsubsection}{\numberline {3.1.1.8}Argmax}{17}{subsubsection.3.1.1.8}%
+\contentsline {subsubsection}{\numberline {3.1.1.9}ROM de Pesos}{17}{subsubsection.3.1.1.9}%
+\contentsline {subsection}{\numberline {3.1.2}Máquina de Estados de Controle}{17}{subsection.3.1.2}%
+\contentsline {section}{\numberline {3.2}Validação da Arquitetura de Hardware}{19}{section.3.2}%
+\contentsline {subsection}{\numberline {3.2.1}Métricas de Avaliação}{19}{subsection.3.2.1}%
+\contentsline {subsection}{\numberline {3.2.2}Resultados das Camadas}{20}{subsection.3.2.2}%
+\contentsline {subsection}{\numberline {3.2.3}Análise Gráfica e Conclusões}{20}{subsection.3.2.3}%
+\setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
+\contentsline {chapter}{\chapternumberline {4}\MakeTextUppercase []{Sistema de Visão e Comunicação}}{24}{chapter.4}%
+\contentsline {section}{\numberline {4.1}Protocolo UART}{24}{section.4.1}%
+\contentsline {section}{\numberline {4.2}VGA}{26}{section.4.2}%
+\contentsline {subsection}{\numberline {4.2.1}Modo Vídeo}{26}{subsection.4.2.1}%
+\contentsline {subsection}{\numberline {4.2.2}Modo Rosto}{27}{subsection.4.2.2}%
+\contentsline {subsection}{\numberline {4.2.3}Sprite de nomes}{27}{subsection.4.2.3}%
+\contentsline {subsection}{\numberline {4.2.4}Controle de Exibição}{27}{subsection.4.2.4}%
+\setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
+\contentsline {chapter}{\chapternumberline {5}\MakeTextUppercase []{Integração Final e Validação}}{28}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Pipeline}{28}{section.5.1}%
+\contentsline {section}{\numberline {5.2}Diagrama de Blocos}{28}{section.5.2}%
+\contentsline {subsection}{\numberline {5.2.1}Fluxo de Dados \textit {End-to-End}}{29}{subsection.5.2.1}%
+\contentsline {section}{\numberline {5.3}Validação do Artefato Final}{31}{section.5.3}%
+\contentsline {section}{\numberline {5.4}Problemas Encontrados}{31}{section.5.4}%
+\setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
+\contentsline {chapter}{\chapternumberline {6}\MakeTextUppercase []{Conclusão}}{33}{chapter.6}%
+\setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
+\contentsline {chapter}{\chapternumberline {7}\MakeTextUppercase []{Contribuições}}{35}{chapter.7}%
+\vspace {\cftbeforechapterskip }
+\setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
+\contentsline {chapter}{\MakeTextUppercase []{Refer\^encias Bibliogr\'aficas}}{36}{section*.11}%
