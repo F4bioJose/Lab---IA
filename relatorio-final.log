@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026/Arch Linux) (preloaded format=pdflatex 2026.6.9)  25 JUN 2026 22:08
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026/Arch Linux) (preloaded format=pdflatex 2026.6.9)  25 JUN 2026 22:14
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -1303,7 +1303,7 @@ l.138
 
 
 
-] (./relatorio-final.loq) [2] (./relatorio-final.lot
+] (./relatorio-final.lot
 LaTeX Font Info:    Trying to load font information for T1+lmtt on input line 4.
  (/usr/share/texmf-dist/tex/latex/lm/t1lmtt.fd
 File: t1lmtt.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
@@ -1312,26 +1312,24 @@ Package microtype Info: Loading generic protrusion settings for font family
 (microtype)             `lmtt' (encoding: T1).
 (microtype)             For optimal results, create family-specific settings.
 (microtype)             See the microtype manual for details.
-) [3
-
-{/usr/share/texmf-dist/fonts/enc/dvips/lm/lm-rm.enc}{/usr/share/texmf-dist/fonts/enc/dvips/lm/lm-mathsy.enc}] (./relatorio-final.toc
+) [2{/usr/share/texmf-dist/fonts/enc/dvips/lm/lm-rm.enc}{/usr/share/texmf-dist/fonts/enc/dvips/lm/lm-mathsy.enc}] (./relatorio-final.toc
 LaTeX Font Info:    Font shape `T1/lmtt/bx/n' in size <12> not available
-(Font)              Font shape `T1/lmtt/b/n' tried instead on input line 23.
+(Font)              Font shape `T1/lmtt/b/n' tried instead on input line 22.
 LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <10.95> on input line 26.
- [4
+(Font)              <10.95> on input line 25.
+ [3
 
 ]
 LaTeX Font Info:    Font shape `T1/lmss/m/it' in size <12> not available
-(Font)              Font shape `T1/lmss/m/sl' tried instead on input line 51.
-) [5]
+(Font)              Font shape `T1/lmss/m/sl' tried instead on input line 50.
+) [4]
 \openout2 = `pre-textuais/resumo.aux'.
 
  (./pre-textuais/resumo.tex
 LaTeX Font Info:    Trying to load font information for TS1+lmr on input line 9.
  (/usr/share/texmf-dist/tex/latex/lm/ts1lmr.fd
 File: ts1lmr.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
-) [6
+) [5
 
 
 {/usr/share/texmf-dist/fonts/enc/dvips/lm/lm-ts1.enc}])
@@ -1339,7 +1337,7 @@ File: ts1lmr.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
 
  (./capitulos/introducao.tex
 Cap\'{\i }tulo 1.
-[7
+[6
 
 
 
@@ -1355,38 +1353,38 @@ LaTeX Warning: Citation `MADAOUI2023104927' undefined on input line 18.
 )
 Package babel Info: 'brazilian' activates 'portuges' shorthands.
 (babel)             Reported on input line 168.
- [8]
+ [7]
 \openout2 = `capitulos/artefato1.aux'.
 
  (./capitulos/artefato1.tex
 Cap\'{\i }tulo 2.
-<imagens/image6.png, id=187, 633.11531pt x 542.025pt>
+<imagens/image6.png, id=181, 633.11531pt x 542.025pt>
 File: imagens/image6.png Graphic file (type png)
 <use imagens/image6.png>
 Package pdftex.def Info: imagens/image6.png  used on input line 15.
 (pdftex.def)             Requested size: 364.00139pt x 311.63713pt.
-[9
+[8
 
 
 
 
-] [10
+] [9
 pdfTeX warning (ext4): destination with the same identifier (name{figure.2.1}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
 l.29 
       <./imagens/image6.png>]
-<imagens/image4.png, id=200, 1127.71312pt x 469.00218pt>
+<imagens/image4.png, id=194, 1127.71312pt x 469.00218pt>
 File: imagens/image4.png Graphic file (type png)
 <use imagens/image4.png>
 Package pdftex.def Info: imagens/image4.png  used on input line 34.
 (pdftex.def)             Requested size: 455.0pt x 189.2292pt.
- [11
+ [10
 pdfTeX warning (ext4): destination with the same identifier (name{figure.2.2}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
 l.49     \item \textbf
-                      {Balanced Accuracy:} 0.9918 <./imagens/image4.png>] [12]) [13
+                      {Balanced Accuracy:} 0.9918 <./imagens/image4.png>] [11]) [12
 pdfTeX warning (ext4): destination with the same identifier (name{table.2.1}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
@@ -1408,7 +1406,7 @@ Package hyperref Warning: Token not allowed in a PDF string (Unicode):
 Package hyperref Warning: Token not allowed in a PDF string (Unicode):
 (hyperref)                removing `math shift' on input line 58.
 
-[14
+[13
 
 
 
@@ -1428,7 +1426,7 @@ pdfTeX warning (ext4): destination with the same identifier (name{table.3.3}) ha
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
 l.60 
-     ] [15
+     ] [14
 pdfTeX warning (ext4): destination with the same identifier (name{table.3.4}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
@@ -1438,7 +1436,7 @@ pdfTeX warning (ext4): destination with the same identifier (name{table.3.5}) ha
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
 l.101 
-      {/usr/share/texmf-dist/fonts/enc/dvips/lm/lm-mathit.enc}{/usr/share/texmf-dist/fonts/enc/dvips/lm/lm-mathex.enc}] [16
+      {/usr/share/texmf-dist/fonts/enc/dvips/lm/lm-mathit.enc}{/usr/share/texmf-dist/fonts/enc/dvips/lm/lm-mathex.enc}] [15
 pdfTeX warning (ext4): destination with the same identifier (name{table.3.6}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
@@ -1449,17 +1447,17 @@ pdfTeX warning (ext4): destination with the same identifier (name{table.3.7}) ha
                                                   \__shipout_drop_firstpage_...
 l.147 
       ]
-<imagens/image13.png, id=239, 2006.49625pt x 1310.8975pt>
+<imagens/image13.png, id=233, 2006.49625pt x 1310.8975pt>
 File: imagens/image13.png Graphic file (type png)
 <use imagens/image13.png>
 Package pdftex.def Info: imagens/image13.png  used on input line 182.
 (pdftex.def)             Requested size: 455.0pt x 297.25952pt.
- [17
+ [16
 pdfTeX warning (ext4): destination with the same identifier (name{table.3.8}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
 l.186 
-      ] [18
+      ] [17
 pdfTeX warning (ext4): destination with the same identifier (name{figure.3.4}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
@@ -1469,12 +1467,12 @@ pdfTeX warning (ext4): destination with the same identifier (name{table.3.9}) ha
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
 l.213 
-       <./imagens/image13.png>] [19] [20
+       <./imagens/image13.png>] [18] [19
 pdfTeX warning (ext4): destination with the same identifier (name{table.3.10}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
 l.323 A
-       dicionalmente, os valores do MAE e do RMSE apresentaram baixa discrep...] [21
+       dicionalmente, os valores do MAE e do RMSE apresentaram baixa discrep...] [20
 pdfTeX warning (ext4): destination with the same identifier (name{table.3.11}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
@@ -1485,58 +1483,58 @@ pdfTeX warning (ext4): destination with the same identifier (name{table.3.12}) h
                                                   \__shipout_drop_firstpage_...
 l.332 
       ]
-<imagens/image16.png, id=293, 2006.49625pt x 618.31pt>
+<imagens/image16.png, id=287, 2006.49625pt x 618.31pt>
 File: imagens/image16.png Graphic file (type png)
 <use imagens/image16.png>
 Package pdftex.def Info: imagens/image16.png  used on input line 336.
-(pdftex.def)             Requested size: 364.00139pt x 112.16841pt.
-<imagens/image8.png, id=294, 2006.49625pt x 619.31375pt>
+(pdftex.def)             Requested size: 409.49722pt x 126.1883pt.
+<imagens/image8.png, id=288, 2006.49625pt x 619.31375pt>
 File: imagens/image8.png Graphic file (type png)
 <use imagens/image8.png>
 Package pdftex.def Info: imagens/image8.png  used on input line 343.
-(pdftex.def)             Requested size: 364.00139pt x 112.35051pt.
-<imagens/image11.png, id=295, 2006.49625pt x 618.31pt>
+(pdftex.def)             Requested size: 409.49722pt x 126.39314pt.
+<imagens/image11.png, id=289, 2006.49625pt x 618.31pt>
 File: imagens/image11.png Graphic file (type png)
 <use imagens/image11.png>
 Package pdftex.def Info: imagens/image11.png  used on input line 350.
-(pdftex.def)             Requested size: 364.00139pt x 112.16841pt.
-<imagens/image7.png, id=296, 2006.49625pt x 618.31pt>
+(pdftex.def)             Requested size: 409.49722pt x 126.1883pt.
+<imagens/image7.png, id=290, 2006.49625pt x 618.31pt>
 File: imagens/image7.png Graphic file (type png)
 <use imagens/image7.png>
 Package pdftex.def Info: imagens/image7.png  used on input line 357.
-(pdftex.def)             Requested size: 364.00139pt x 112.16841pt.
-<imagens/image17.png, id=297, 2006.49625pt x 687.56876pt>
-File: imagens/image17.png Graphic file (type png)
-<use imagens/image17.png>
-Package pdftex.def Info: imagens/image17.png  used on input line 364.
-(pdftex.def)             Requested size: 364.00139pt x 124.73273pt.
- [22
+(pdftex.def)             Requested size: 409.49722pt x 126.1883pt.
+ [21
 pdfTeX warning (ext4): destination with the same identifier (name{figure.3.5}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.368 
+l.361 
       
 pdfTeX warning (ext4): destination with the same identifier (name{figure.3.6}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.368 
+l.361 
       
 pdfTeX warning (ext4): destination with the same identifier (name{figure.3.7}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.368 
-      
-pdfTeX warning (ext4): destination with the same identifier (name{figure.3.8}) has been already used, duplicate ignored
-<argument> ...shipout:D \box_use:N \l_shipout_box 
-                                                  \__shipout_drop_firstpage_...
-l.368 
-       <./imagens/image16.png> <./imagens/image8.png> <./imagens/image11.png> <./imagens/image7.png>]
-<imagens/image5.png, id=306, 2006.49625pt x 689.57625pt>
+l.361 
+       <./imagens/image16.png> <./imagens/image8.png> <./imagens/image11.png>]
+<imagens/image17.png, id=298, 2006.49625pt x 687.56876pt>
+File: imagens/image17.png Graphic file (type png)
+<use imagens/image17.png>
+Package pdftex.def Info: imagens/image17.png  used on input line 364.
+(pdftex.def)             Requested size: 409.49722pt x 140.32301pt.
+<imagens/image5.png, id=299, 2006.49625pt x 689.57625pt>
 File: imagens/image5.png Graphic file (type png)
 <use imagens/image5.png>
 Package pdftex.def Info: imagens/image5.png  used on input line 371.
-(pdftex.def)             Requested size: 364.00139pt x 125.09691pt.
-) [23
+(pdftex.def)             Requested size: 409.49722pt x 140.73271pt.
+) [22
+pdfTeX warning (ext4): destination with the same identifier (name{figure.3.8}) has been already used, duplicate ignored
+<argument> ...shipout:D \box_use:N \l_shipout_box 
+                                                  \__shipout_drop_firstpage_...
+l.175 \include{capitulos/artefato2}
+                                   
 pdfTeX warning (ext4): destination with the same identifier (name{figure.3.9}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
@@ -1546,28 +1544,28 @@ pdfTeX warning (ext4): destination with the same identifier (name{figure.3.10}) 
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
 l.175 \include{capitulos/artefato2}
-                                    <./imagens/image17.png> <./imagens/image5.png>]
+                                    <./imagens/image7.png> <./imagens/image17.png> <./imagens/image5.png>]
 \openout2 = `capitulos/artefato3.aux'.
 
  (./capitulos/artefato3.tex
 Cap\'{\i }tulo 4.
-[24
+[23
 
 
 
 
 ]
-<imagens/image10.png, id=326, 852.18375pt x 361.35pt>
+<imagens/image10.png, id=319, 852.18375pt x 361.35pt>
 File: imagens/image10.png Graphic file (type png)
 <use imagens/image10.png>
 Package pdftex.def Info: imagens/image10.png  used on input line 29.
-(pdftex.def)             Requested size: 227.5pt x 96.46304pt.
- [25
+(pdftex.def)             Requested size: 364.00139pt x 154.34639pt.
+ [24
 pdfTeX warning (ext4): destination with the same identifier (name{figure.4.11}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
-l.57 
-      <./imagens/image10.png>] [26]) [27]
+l.55 \subsection
+                *{Se o Byte =/= 0xFF} O fluxo √© roteado para o Modo V√≠deo.... <./imagens/image10.png>] [25]) [26]
 \openout2 = `capitulos/artefato4.aux'.
 
  (./capitulos/artefato4.tex
@@ -1577,7 +1575,7 @@ Overfull \hbox (17.48645pt too wide) in paragraph at lines 14--15
 []\T1/lmr/m/n/12 (-20) Webcam USB $\OMS/lmsy/m/n/12 !$ \T1/lmr/m/n/12 (-20) de-tec-Á„o Haar Cas-cade $\OMS/lmsy/m/n/12 !$ \T1/lmr/m/n/12 (-20) prÈ-processamento
  []
 
-[28
+[27
 
 
 
@@ -1585,39 +1583,39 @@ Overfull \hbox (17.48645pt too wide) in paragraph at lines 14--15
 ]
 LaTeX Font Info:    Font shape `T1/lmss/m/it' in size <14.4> not available
 (Font)              Font shape `T1/lmss/m/sl' tried instead on input line 21.
- [29]
-<imagens/image12.jpg, id=353, 2006.49625pt x 1878.01625pt>
+ [28]
+<imagens/image12.jpg, id=347, 2006.49625pt x 1878.01625pt>
 File: imagens/image12.jpg Graphic file (type jpg)
 <use imagens/image12.jpg>
 Package pdftex.def Info: imagens/image12.jpg  used on input line 37.
 (pdftex.def)             Requested size: 455.0pt x 425.85954pt.
- [30
+ [29
 pdfTeX warning (ext4): destination with the same identifier (name{figure.5.12}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
 l.43 
       <./imagens/image12.jpg>]
-<imagens/image14.png, id=361, 2006.49625pt x 1126.2075pt>
+<imagens/image14.png, id=354, 2006.49625pt x 1126.2075pt>
 File: imagens/image14.png Graphic file (type png)
 <use imagens/image14.png>
 Package pdftex.def Info: imagens/image14.png  used on input line 49.
 (pdftex.def)             Requested size: 409.49722pt x 229.84296pt.
- [31
+ [30
 pdfTeX warning (ext4): destination with the same identifier (name{figure.5.13}) has been already used, duplicate ignored
 <argument> ...shipout:D \box_use:N \l_shipout_box 
                                                   \__shipout_drop_firstpage_...
 l.64 
-      <./imagens/image14.png>]) [32]
+      <./imagens/image14.png>]) [31]
 \openout2 = `capitulos/conclus√£o.aux'.
 
  (./capitulos/conclus√£o.tex
 Cap\'{\i }tulo 6.
-[33
+[32
 
 
 
 
-]) [34]
+]) [33]
 \openout2 = `capitulos/contribuicoes.aux'.
 
  (./capitulos/contribuicoes.tex
@@ -1627,7 +1625,7 @@ Underfull \hbox (badness 1521) in paragraph at lines 19--20
 []|\T1/lmr/m/n/10.95 (+20) AquisiÁ„o \TS1/lmr/m/n/10.95 (+20) à \T1/lmr/m/n/10.95 (+20) Trei-na-mento Of-fline \TS1/lmr/m/n/10.95 (+20) à \T1/lmr/m/n/10.95 (+20) Hard-ware \TS1/lmr/m/n/10.95 (+20) à \T1/lmr/m/n/10.95 (+20) Vi-
  []
 
-) [35
+) [34
 
 
 
@@ -1646,19 +1644,16 @@ bibitemlist
 
 LaTeX Warning: Empty `thebibliography' environment on input line 8.
 
-) [36
+) [35
 
 
 
 ]
-\tf@loq=\write8
-\openout8 = `relatorio-final.loq'.
+\tf@lot=\write8
+\openout8 = `relatorio-final.lot'.
 
-\tf@lot=\write9
-\openout9 = `relatorio-final.lot'.
-
-\tf@toc=\write10
-\openout10 = `relatorio-final.toc'.
+\tf@toc=\write9
+\openout9 = `relatorio-final.toc'.
 
  (./relatorio-final.aux (./pre-textuais/resumo.aux) (./capitulos/introducao.aux) (./capitulos/artefato1.aux) (./capitulos/artefato2.aux) (./capitulos/artefato3.aux) (./capitulos/artefato4.aux) (./capitulos/conclus√£o.aux) (./capitulos/contribuicoes.aux))
  ***********
@@ -1673,18 +1668,18 @@ Package rerunfilecheck Info: File `relatorio-final.brf' has not changed.
 (rerunfilecheck)             Checksum: D41D8CD98F00B204E9800998ECF8427E;0.
  ) 
 Here is how much of TeX's memory you used:
- 44120 strings out of 468981
- 894152 string characters out of 5459924
- 1464062 words of memory out of 5000000
- 71789 multiletter control sequences out of 15000+600000
+ 44109 strings out of 468981
+ 893991 string characters out of 5459924
+ 1465067 words of memory out of 5000000
+ 71784 multiletter control sequences out of 15000+600000
  738045 words of font info for 235 fonts, out of 8000000 for 9000
  266 hyphenation exceptions out of 8191
  99i,13n,108p,1634b,712s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/share/texmf-dist/fonts/type1/public/lm/lmbx10.pfb></usr/share/texmf-dist/fonts/type1/public/lm/lmbx12.pfb></usr/share/texmf-dist/fonts/type1/public/lm/lmbxi10.pfb></usr/share/texmf-dist/fonts/type1/public/lm/lmcsc10.pfb></usr/share/texmf-dist/fonts/type1/public/lm/lmex10.pfb></usr/share/texmf-dist/fonts/type1/public/lm/lmmi12.pfb></usr/share/texmf-dist/fonts/type1/public/lm/lmmi8.pfb></usr/share/texmf-dist/fonts/type1/public/lm/lmr10.pfb></usr/share/texmf-dist/fonts/type1/public/lm/lmr12.pfb></usr/share/texmf-dist/fonts/type1/public/lm/lmr8.pfb></usr/share/texmf-dist/fonts/type1/public/lm/lmri10.pfb></usr/share/texmf-dist/fonts/type1/public/lm/lmri12.pfb></usr/share/texmf-dist/fonts/type1/public/lm/lmss10.pfb></usr/share/texmf-dist/fonts/type1/public/lm/lmss12.pfb></usr/share/texmf-dist/fonts/type1/public/lm/lmss17.pfb></usr/share/texmf-dist/fonts/type1/public/lm/lmssbx10.pfb></usr/share/texmf-dist/fonts/type1/public/lm/lmsso12.pfb></usr/share/texmf-dist/fonts/type1/public/lm/lmsy10.pfb></usr/share/texmf-dist/fonts/type1/public/lm/lmtk10.pfb></usr/share/texmf-dist/fonts/type1/public/lm/lmtt10.pfb></usr/share/texmf-dist/fonts/type1/public/lm/lmtt12.pfb></usr/share/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb>
-Output written on relatorio-final.pdf (37 pages, 2478869 bytes).
+Output written on relatorio-final.pdf (36 pages, 2478569 bytes).
 PDF statistics:
- 687 PDF objects out of 1000 (max. 8388607)
- 569 compressed objects within 6 object streams
- 139 named destinations out of 1000 (max. 500000)
- 66014 words of extra memory for PDF output out of 74296 (max. 10000000)
+ 674 PDF objects out of 1000 (max. 8388607)
+ 557 compressed objects within 6 object streams
+ 136 named destinations out of 1000 (max. 500000)
+ 66006 words of extra memory for PDF output out of 74296 (max. 10000000)
 

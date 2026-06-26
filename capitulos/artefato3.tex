@@ -24,11 +24,11 @@ O submódulo \texttt{uart\_rx} realiza oversampling assíncrono gerenciado por u
 \end{enumerate}
 
 
-\begin{figure}
+\begin{figure}[H]
     \centering
-    \includegraphics[width=0.5\linewidth]{imagens/image10.png}
-    \caption{Caption}
-    \label{fig:placeholder}
+    \includegraphics[width=0.8\linewidth]{imagens/image10.png}
+    \caption{FSM do UART RX}
+    \label{fig:uart_rx_fsm}
 \end{figure}
 
 Devido à assincronia com o mundo externo, o sinal RX passa por um circuito Double-Sync Flip-Flop (\texttt{rx\_sync\_1} e \texttt{rx\_sync\_2}) antes de entrar na UART, mitigando a ocorrência de metaestabilidade.

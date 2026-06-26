@@ -491,9 +491,6 @@ INPUT /usr/share/texmf-dist/tex/latex/microtype/mt-msb.cfg
 INPUT /usr/share/texmf-dist/fonts/tfm/public/amsfonts/symbols/msbm10.tfm
 INPUT /usr/share/texmf-dist/fonts/tfm/public/amsfonts/symbols/msbm7.tfm
 INPUT /usr/share/texmf-dist/fonts/tfm/public/lm/ec-lmss17.tfm
-INPUT ./relatorio-final.loq
-INPUT ./relatorio-final.loq
-INPUT relatorio-final.loq
 INPUT ./relatorio-final.lot
 INPUT ./relatorio-final.lot
 INPUT relatorio-final.lot
@@ -653,7 +650,6 @@ INPUT relatorio-final.brf
 INPUT ./relatorio-final.brf
 INPUT ./relatorio-final.brf
 OUTPUT relatorio-final.brf
-OUTPUT relatorio-final.loq
 OUTPUT relatorio-final.lot
 OUTPUT relatorio-final.toc
 INPUT relatorio-final.aux
