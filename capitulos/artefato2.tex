@@ -57,7 +57,6 @@ Responsável pela decodificação da comunicação serial em \textit{bytes} de 8
 
 \subsubsection{Framebuffer $32 \times 32$}
 Responsável pela escrita espelhada em duas memórias internas distintas de 1024 \textit{bytes}, permitindo a leitura simultânea pela CNN e pelo módulo VGA em frequências diferentes. Durante a escrita, recebe sinais de controle e de endereço do \texttt{cnn\_top}, processando os dados advindos da UART. Na leitura da rede, a FSM do \texttt{cnn\_top} envia sinais de requisição e recebe o pixel correspondente. Para a exibição em tela, o controlador VGA faz requisições similares na segunda memória. Ao receber um sinal de \textit{reset}, todos os endereços de ambas as memórias são zerados (\texttt{0x00}).
-
 \begin{table}[htbp]
 \centering
 \caption{Principais sinais do submódulo Framebuffer $32 \times 32$}

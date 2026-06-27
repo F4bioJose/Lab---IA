@@ -6,10 +6,10 @@
 \contentsline {table}{\numberline {4}{\ignorespaces Principais sinais do submódulo Framebuffer $32 \times 32$}}{14}{table.3.4}%
 \contentsline {table}{\numberline {5}{\ignorespaces Principais sinais do submódulo Line Buffer}}{14}{table.3.5}%
 \contentsline {table}{\numberline {6}{\ignorespaces Principais sinais do submódulo de Convolução}}{15}{table.3.6}%
-\contentsline {table}{\numberline {7}{\ignorespaces Principais sinais do submódulo de Camada Densa}}{15}{table.3.7}%
+\contentsline {table}{\numberline {7}{\ignorespaces Principais sinais do submódulo de Camada Densa}}{16}{table.3.7}%
 \contentsline {table}{\numberline {8}{\ignorespaces Principais sinais do submódulo Argmax}}{16}{table.3.8}%
-\contentsline {table}{\numberline {9}{\ignorespaces Sinais de controle da FSM principal do módulo \texttt {cnn\_top}}}{17}{table.3.9}%
-\contentsline {table}{\numberline {10}{\ignorespaces Métricas de validação para a Camada de Convolução}}{19}{table.3.10}%
+\contentsline {table}{\numberline {9}{\ignorespaces Sinais de controle da FSM principal do módulo \texttt {cnn\_top}}}{18}{table.3.9}%
+\contentsline {table}{\numberline {10}{\ignorespaces Métricas de validação para a Camada de Convolução}}{20}{table.3.10}%
 \contentsline {table}{\numberline {11}{\ignorespaces Métricas de validação para as Camadas de Max Pooling e Flatten}}{20}{table.3.11}%
 \contentsline {table}{\numberline {12}{\ignorespaces Métricas de validação para a Camada Densa}}{20}{table.3.12}%
-\contentsline {table}{\numberline {13}{\ignorespaces Síntese de Contribuições Individuais}}{34}{table.7.13}%
+\contentsline {table}{\numberline {13}{\ignorespaces Síntese de Contribuições Individuais}}{35}{table.7.13}%

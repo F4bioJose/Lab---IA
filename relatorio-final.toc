@@ -30,30 +30,32 @@
 \contentsline {subsubsection}{\numberline {3.1.1.7}Camada Densa}{15}{subsubsection.3.1.1.7}%
 \contentsline {subsubsection}{\numberline {3.1.1.8}Argmax}{16}{subsubsection.3.1.1.8}%
 \contentsline {subsubsection}{\numberline {3.1.1.9}ROM de Pesos}{16}{subsubsection.3.1.1.9}%
-\contentsline {subsection}{\numberline {3.1.2}Máquina de Estados de Controle}{16}{subsection.3.1.2}%
+\contentsline {subsection}{\numberline {3.1.2}Máquina de Estados de Controle}{17}{subsection.3.1.2}%
 \contentsline {section}{\numberline {3.2}Validação da Arquitetura de Hardware}{18}{section.3.2}%
-\contentsline {subsection}{\numberline {3.2.1}Métricas de Avaliação}{18}{subsection.3.2.1}%
-\contentsline {subsection}{\numberline {3.2.2}Resultados das Camadas}{19}{subsection.3.2.2}%
-\contentsline {subsection}{\numberline {3.2.3}Análise Gráfica e Conclusões}{19}{subsection.3.2.3}%
+\contentsline {subsection}{\numberline {3.2.1}Métricas de Avaliação}{19}{subsection.3.2.1}%
+\contentsline {subsection}{\numberline {3.2.2}Resultados das Camadas}{20}{subsection.3.2.2}%
+\contentsline {subsection}{\numberline {3.2.3}Análise Gráfica e Conclusões}{20}{subsection.3.2.3}%
 \setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
-\contentsline {chapter}{\chapternumberline {4}\MakeTextUppercase []{Sistema de Visão e Comunicação}}{23}{chapter.4}%
-\contentsline {section}{\numberline {4.1}Protocolo UART}{23}{section.4.1}%
-\contentsline {section}{\numberline {4.2}VGA}{25}{section.4.2}%
-\contentsline {subsection}{\numberline {4.2.1}Modo Vídeo}{25}{subsection.4.2.1}%
-\contentsline {subsection}{\numberline {4.2.2}Modo Rosto}{26}{subsection.4.2.2}%
-\contentsline {subsection}{\numberline {4.2.3}Sprite de nomes}{26}{subsection.4.2.3}%
-\contentsline {subsection}{\numberline {4.2.4}Controle de Exibição}{26}{subsection.4.2.4}%
+\contentsline {chapter}{\chapternumberline {4}\MakeTextUppercase []{Sistema de Visão e Comunicação}}{24}{chapter.4}%
+\contentsline {section}{\numberline {4.1}Protocolo UART}{24}{section.4.1}%
+\contentsline {section}{\numberline {4.2}VGA}{26}{section.4.2}%
+\contentsline {subsection}{\numberline {4.2.1}Modo Vídeo}{26}{subsection.4.2.1}%
+\contentsline {subsection}{\numberline {4.2.2}Modo Rosto}{27}{subsection.4.2.2}%
+\contentsline {subsection}{\numberline {4.2.3}Sprite de nomes}{27}{subsection.4.2.3}%
+\contentsline {subsection}{\numberline {4.2.4}Controle de Exibição}{27}{subsection.4.2.4}%
 \setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
-\contentsline {chapter}{\chapternumberline {5}\MakeTextUppercase []{Integração Final e Validação}}{27}{chapter.5}%
-\contentsline {section}{\numberline {5.1}Pipeline}{27}{section.5.1}%
-\contentsline {section}{\numberline {5.2}Diagrama de Blocos}{27}{section.5.2}%
-\contentsline {subsection}{\numberline {5.2.1}Fluxo de Dados \textit {End-to-End}}{28}{subsection.5.2.1}%
-\contentsline {section}{\numberline {5.3}Validação do Artefato Final}{30}{section.5.3}%
-\contentsline {section}{\numberline {5.4}Problemas Encontrados}{30}{section.5.4}%
+\contentsline {chapter}{\chapternumberline {5}\MakeTextUppercase []{Integração Final e Validação}}{28}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Pipeline}{28}{section.5.1}%
+\contentsline {section}{\numberline {5.2}Diagrama de Blocos}{28}{section.5.2}%
+\contentsline {subsection}{\numberline {5.2.1}Fluxo de Dados \textit {End-to-End}}{29}{subsection.5.2.1}%
+\contentsline {section}{\numberline {5.3}Validação do Artefato Final}{31}{section.5.3}%
+\contentsline {section}{\numberline {5.4}Problemas Encontrados}{31}{section.5.4}%
 \setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
-\contentsline {chapter}{\chapternumberline {6}\MakeTextUppercase []{Conclusão}}{32}{chapter.6}%
+\contentsline {chapter}{\chapternumberline {6}\MakeTextUppercase []{Conclusão}}{33}{chapter.6}%
 \setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
-\contentsline {chapter}{\chapternumberline {7}\MakeTextUppercase []{Contribuições}}{34}{chapter.7}%
-\vspace {\cftbeforechapterskip }
+\contentsline {chapter}{\chapternumberline {7}\MakeTextUppercase []{Contribuições}}{35}{chapter.7}%
 \setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
-\contentsline {chapter}{\MakeTextUppercase []{Refer\^encias Bibliogr\'aficas}}{35}{section*.10}%
+\contentsline {chapter}{REFERÊNCIAS}{36}{chapter*.8}%
+\setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
+\contentsline {chapter}{\MakeTextUppercase []{Refer\^encias Bibliogr\'aficas}}{37}{section*.10}%
+\vspace {\cftbeforechapterskip }
